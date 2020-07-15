@@ -1,6 +1,7 @@
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 % *                                                               *
 % *                 Program by Ben Kaye (c) 2020                  *
+% *            Using model provided by Aren Karapetyan            *
 % *                         EUROP Project                         *
 % *                                                               *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -44,18 +45,13 @@ system = connect(plant, controller, sum, 'r', 'y');
 
 d_system = c2d(system, Ts);
 
-TF = minreal(zpk(d_system));
+%Get state space matrices corresponding to x,y,xdot,ydot,pitch and roll
+Ad = d_system.A([1:2, 4:5, 7:8], [1:2, 4:5, 7:8]);
 
-
-Nc = 4;
-Np = 10;
+%Input corresponding to xdot and ydot
+Bd = d_system.B([1:2, 4:5, 7:8], [4, 5]);
 
 % [ Ae, Be, Ce, PhiT_Phi, PhiT_F, PhiT_R ] = mpc_gains( Ad, Bd, Cd, Nc, Np);
-
-
-
-
-
 % x_0 = [0.1; 0.2];
 % deltaU = (PhiT_Phi + r_w * eye(Nc))\(PhiT_R - PhiT_F*x_0);
 
