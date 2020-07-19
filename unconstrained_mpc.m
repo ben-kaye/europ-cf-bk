@@ -51,6 +51,7 @@ x = x_0;
 
 
 
+speed = 0;
 
 for i = 1:T
     %returns Algebraic-Ricatti iterator for k + 1
@@ -61,12 +62,17 @@ for i = 1:T
     
     x = A*x + B*u;
     
+    sp = norm([x(3); x(4)],2);
+    speed = max([speed, sp]);
+    
     hold on    
     plot(x(1), x(2), 'bo')
     axis([-5 5 -5 5])
 %     axis equal
     
 end
+
+
 
 %check this is in fact getting k-1 looks to be right
 function Pnmin = RicattiIter(A,B,Q,R,P,n)
@@ -76,7 +82,6 @@ function Pnmin = RicattiIter(A,B,Q,R,P,n)
         Pnmin = Q + A'*P*A - A'*P*B*((B'*P*B + R)\(B'*P*A));
         Pnmin = RicattiIter(A,B,Q,R,Pnmin,n);
 %         n
-    end
-    
+    end    
 end
 

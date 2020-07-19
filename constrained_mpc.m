@@ -92,7 +92,7 @@ figure(1)
 plot(x0(1), x0(2), 'b+')
 hold on
 plot(ref(1), ref(2), 'b+')
-simtime = 100;
+simtime = 10;
 for i = 1 : simtime
     
     res = prob.solve();
@@ -100,18 +100,29 @@ for i = 1 : simtime
         error('OSQP could not solve')
     end
     
-    ctrl = res.x( (N+1)*nx+1 : (N+1)*nx + nu );
-    x0 = Ad * x0 + Bd * ctrl;
+    xN = res.x;
+    ctrls = xN( (N+1)*nx + 1 : end );
+    ctrls = reshape(ctrls, [nu, N]);
     
+    x0 = Ad * x0 + Bd * ctrls(:,1);
+    hold on
+    plot(x0(1),x0(2), 'r.', 'MarkerSize', 20)
+%     axis([-1 1 -1 1])
+    axis equal
     
+    x1 = x0;
+    for j = 2:4
+        x1 = Ad * x1 + Bd * ctrls(:, j);
+        hold on
+        zscat = scatter(x1(1),x1(2), 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'b');
+        zscat.MarkerFaceAlpha = .2;
+        zscat.MarkerEdgeAlpha = .2;
+        axis equal
+    end
     
     l(1:nx) = -x0;
     u(1:nx) = -x0;
     prob.update('l',l, 'u',u);
-    
-    hold on
-    plot(x0(1),x0(2), 'ro')
-    axis([-1 1 -1 1])
     
 end
 
