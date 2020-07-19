@@ -33,12 +33,11 @@ Bd = [   0.00370875152761323,    0;
 [nx, nu] = size(Bd);    
     
 % initial conditions
-ref = [ 0.6; 0.2; 0; 0; 0; 0 ];
-x0 = [ -0.2; -0.5; 0; 0; 0; 0 ];
-x0 = [-0.196288558510390;-0.496291279506062;0.105783346431667;0.105705792729527;-0.193243865753017;0.193385643954741];
+ref = [ 2; 0.5; 0; 0; 0; 0 ];
+x0 = [ 0.1; 0.1; 0; 0; 0; 0 ];
 
-obj_xy = [ -0.9; -0.9 ];
-min_dist = 0.1;
+obj_xy = [1;0.5];
+min_dist = 0.3;
 
 % predictive horizon
 N = 10;
@@ -77,6 +76,7 @@ Aeq = [ Ax, Bu ];
 % should it be -ve or +ve
 leq = [ -x0; zeros(N*nx, 1); -obj_xy ];
 ueq = leq;
+Nx = leq;
 
 % input and state constraints
 
@@ -98,6 +98,8 @@ A = [ Aeq; Aineq; Aplus ];
 l = [ leq; lineq; -inf*ones((N+1), 1) ];
 u = [ ueq; uineq; inf*ones((N+1), 1)];
 
+% [ A, l ] = update_dist_constraint(A, l, N, nx, nu, o_states, min_dist, Nx);
+
 % osqp init and setup
 prob = osqp;
 prob.setup( P, q, A, l, u, 'warm_start', true, 'verbose', false );
@@ -110,20 +112,42 @@ plot(ref(1), ref(2), 'bx', 'MarkerSize', 30)
 plot(obj_xy(1), obj_xy(2), 'k+')
 viscircles(obj_xy', min_dist)
 
+error_count = 0;
+
 
 simtime = 30;
+nIt = 2;
 for i = 1 : simtime
+%     for j = 1:nIt
+        res = prob.solve();
+        if ~strcmp(res.info.status, 'solved')
+%             error('OSQP could not solve')
+            error_count = error_count + 1;
+        else 
+            error_count = 0;
+            xN = res.x;
+        end 
     
-    res = prob.solve();
-    if ~strcmp(res.info.status, 'solved')
-        error('OSQP could not solve')
-    end
+        
+        
+        [ A, l ] = update_dist_constraint(A, l, N, nx, nu, o_states, min_dist, xN);
     
-    xN = res.x;
-    ctrl = xN( (N+1)*nx + o_states + 1 : (N+1)*nx + o_states + nu );
+%         l(1:nx) = -x0;
+%         u(1:nx) = -x0;
+    %     prob.update('l',l, 'u',u, 'Ax',A); updating A throws an error
+        prob.update('l',l, 'u',u);
+        prob.update('Ax', nonzeros(A));
+        
+        
+        
+%     end
+    
+    
     
     ctrls = xN( (N+1)*nx + o_states + 1 : end );
     ctrls = reshape(ctrls, [nu, N]);
+    
+    ctrl = ctrls(:, 1 + error_count);
     
     x0 = Ad * x0 + Bd * ctrl;
     hold on
@@ -143,9 +167,6 @@ for i = 1 : simtime
     
     
     [ A, l ] = update_dist_constraint(A, l, N, nx, nu, o_states, min_dist, xN);
-%     A = [ Aeq; Aineq];
-%     l = [ leq; lineq];
-    
     
     l(1:nx) = -x0;
     u(1:nx) = -x0;
@@ -153,6 +174,7 @@ for i = 1 : simtime
     prob.update('l',l, 'u',u);
     prob.update('Ax', nonzeros(A));
     
+    axis equal
     
 end
 
