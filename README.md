@@ -1,1 +1,1 @@
-# EUROP Project: Decentralised Collision Avoidance of CrazyFlie Quadcopters
+# EUROP Project: Investigating on-board Collision Avoidance of quad-copters
