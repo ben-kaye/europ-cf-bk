@@ -1,12 +1,12 @@
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 % *                                                               *
 % *                 Program by Ben Kaye (c) 2020                  *
-% *            Using model provided by Aren Karapetyan            *
 % *                         EUROP Project                         *
 % *                                                               *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 % *                                                               *
-% *                    Implements OSQP solver                     *
+% *        Using CrazyFlie model provided by Aren Karapet         *
+% *                        and OSQP Solver                        *
 % *                                                               *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
@@ -123,6 +123,7 @@ for i = 1 : simtime
         if ~strcmp(res.info.status, 'solved')
 %             error('OSQP could not solve')
             error_count = error_count + 1;
+            
         else 
             error_count = 0;
             xN = res.x;
@@ -147,6 +148,8 @@ for i = 1 : simtime
     ctrls = xN( (N+1)*nx + o_states + 1 : end );
     ctrls = reshape(ctrls, [nu, N]);
     
+    %in event of unsolvable path, carry on with previously calculated
+    %optimal path
     ctrl = ctrls(:, 1 + error_count);
     
     x0 = Ad * x0 + Bd * ctrl;
@@ -156,7 +159,7 @@ for i = 1 : simtime
     axis equal
     
     x1 = x0;
-    for j = 2:4
+    for j = [2:4, N]
         x1 = Ad * x1 + Bd * ctrls(:, j);
         hold on
         zscat = scatter(x1(1),x1(2), 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'b');

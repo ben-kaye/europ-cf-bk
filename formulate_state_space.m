@@ -1,8 +1,12 @@
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 % *                                                               *
 % *                 Program by Ben Kaye (c) 2020                  *
-% *            Using model provided by Aren Karapetyan            *
 % *                         EUROP Project                         *
+% *                                                               *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% *                                                               *
+% *        Using CrazyFlie model provided by Aren Karapet         *
+% *                        and OSQP Solver                        *
 % *                                                               *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
@@ -12,7 +16,6 @@ Ts = 1/10;
 cmd_2_newtons_conversion_quadratic_coefficient  =  1.3385e-10;
 cmd_2_newtons_conversion_linear_coefficient     =  6.4870e-6;
 nrotor_vehicle_thrust_max = 0.1597;
-
 
 % LTI continuous-time system
 A = [   zeros(3),   eye(3),     zeros(3);
@@ -32,7 +35,7 @@ plant = ss(A,B,C,D);
 plant.InputName = 'u';
 plant.OutputName = 'y';
 
-
+% get velocity controller dynamics
 [ Ac, Bc, Cc, Dc ] = linmod('crazyflie_controller_ak');
 
 controller = ss(Ac,Bc,Cc,Dc);

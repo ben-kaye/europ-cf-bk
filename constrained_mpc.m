@@ -1,12 +1,12 @@
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 % *                                                               *
 % *                 Program by Ben Kaye (c) 2020                  *
-% *            Using model provided by Aren Karapetyan            *
 % *                         EUROP Project                         *
 % *                                                               *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 % *                                                               *
-% *                    Implements OSQP solver                     *
+% *        Using CrazyFlie model provided by Aren Karapet         *
+% *                        and OSQP Solver                        *
 % *                                                               *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
