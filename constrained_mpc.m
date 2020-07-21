@@ -33,9 +33,9 @@ Bd = [   0.00370875152761323,    0;
 [nx, nu] = size(Bd);    
     
 % initial conditions
-ref = [ 0.6; 0.2; 0; 0; 0; 0 ];
-x0 = [ -0.2; -0.5; 0; 0; 0; 0 ];
-obj_xy = [ 0; 1 ];
+ref = [ 2; 0.5; 0; 0; 0; 0 ];
+x0 = [ 0.1; 0.1; 0; 0; 0; 0 ];
+
 
 % predictive horizon
 N = 10;
@@ -89,10 +89,11 @@ prob.setup( P, q, A, l, u, 'warm_start', true, 'verbose', false );
 
 % simulate
 figure(1)
-plot(x0(1), x0(2), 'b+')
+plot(x0(1), x0(2), 'k+', 'DisplayName', 'Start', 'MarkerSize', 30);
 hold on
-plot(ref(1), ref(2), 'b+')
-simtime = 10;
+plot(ref(1), ref(2), 'r+', 'DisplayName', 'Ref', 'MarkerSize', 30);
+
+simtime = 15;
 for i = 1 : simtime
     
     res = prob.solve();
@@ -106,18 +107,18 @@ for i = 1 : simtime
     
     x0 = Ad * x0 + Bd * ctrls(:,1);
     hold on
-    plot(x0(1),x0(2), 'r.', 'MarkerSize', 20)
+    plot(x0(1),x0(2), '.', 'MarkerSize', 20, 'Color', [1, 0.6, 0])
 %     axis([-1 1 -1 1])
     axis equal
     
     x1 = x0;
-    for j = 2:4
+    for j = 2:N
         x1 = Ad * x1 + Bd * ctrls(:, j);
         hold on
         zscat = scatter(x1(1),x1(2), 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'b');
         zscat.MarkerFaceAlpha = .2;
         zscat.MarkerEdgeAlpha = .2;
-        axis equal
+
     end
     
     l(1:nx) = -x0;
@@ -125,6 +126,10 @@ for i = 1 : simtime
     prob.update('l',l, 'u',u);
     
 end
+title('Speed constrained MPC using OSQP solver')
+xlabel('x (m)')
+ylabel('y (m)')
+axis equal
 
 
 

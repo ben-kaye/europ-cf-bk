@@ -12,6 +12,8 @@
 
 clear,clc
 
+VIS_ON = 1;
+
 % System State-Space
 
 % d_system.A([1:2, 4:5, 7:8], [1:2, 4:5, 7:8])
@@ -40,7 +42,7 @@ obj_xy = [1;0.5];
 min_dist = 0.3;
 
 % predictive horizon
-N = 10;
+N = 15;
 o_states = 2;
 
 % constraints
@@ -77,7 +79,7 @@ Aeq = [ Ax, Bu ];
 leq = [ -x0; zeros(N*nx, 1); -obj_xy ];
 ueq = leq;
 Nx = leq;
-
+xN = Nx;
 % input and state constraints
 
 % augmented state no.
@@ -100,11 +102,15 @@ u = [ ueq; uineq; inf*ones((N+1), 1)];
 
 % [ A, l ] = update_dist_constraint(A, l, N, nx, nu, o_states, min_dist, Nx);
 
+
+
 % osqp init and setup
 prob = osqp;
 prob.setup( P, q, A, l, u, 'warm_start', true, 'verbose', false );
 
 % simulate
+
+if (VIS_ON)
 figure(1)
 plot(x0(1), x0(2), 'bx', 'MarkerSize', 30)
 hold on
@@ -112,38 +118,27 @@ plot(ref(1), ref(2), 'bx', 'MarkerSize', 30)
 plot(obj_xy(1), obj_xy(2), 'k+')
 viscircles(obj_xy', min_dist)
 
+xlabel('x (m)')
+ylabel('y (m)')
+title('Drone at time kT, T=0.1s')
+end
+
 error_count = 0;
 
+simtime = 2;
 
-simtime = 30;
-nIt = 2;
+x_hist = zeros((N+1)*nx, simtime);
+
 for i = 1 : simtime
-%     for j = 1:nIt
-        res = prob.solve();
-        if ~strcmp(res.info.status, 'solved')
-%             error('OSQP could not solve')
-            error_count = error_count + 1;
-            
-        else 
-            error_count = 0;
-            xN = res.x;
-        end 
     
-        
-        
-        [ A, l ] = update_dist_constraint(A, l, N, nx, nu, o_states, min_dist, xN);
-    
-%         l(1:nx) = -x0;
-%         u(1:nx) = -x0;
-    %     prob.update('l',l, 'u',u, 'Ax',A); updating A throws an error
-        prob.update('l',l, 'u',u);
-        prob.update('Ax', nonzeros(A));
-        
-        
-        
-%     end
-    
-    
+    res = prob.solve();
+    if ~strcmp(res.info.status, 'solved')
+            error_count = error_count + 1;                
+    else 
+        error_count = 0;
+        xN = res.x;
+    end 
+   
     
     ctrls = xN( (N+1)*nx + o_states + 1 : end );
     ctrls = reshape(ctrls, [nu, N]);
@@ -153,37 +148,40 @@ for i = 1 : simtime
     ctrl = ctrls(:, 1 + error_count);
     
     x0 = Ad * x0 + Bd * ctrl;
-    hold on
-    plot(x0(1),x0(2), 'r.', 'MarkerSize', 20)
-%     axis([-1 1 -1 1])
-    axis equal
-    
     x1 = x0;
-    for j = [2:4, N]
-        x1 = Ad * x1 + Bd * ctrls(:, j);
-        hold on
-        zscat = scatter(x1(1),x1(2), 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'b');
-        zscat.MarkerFaceAlpha = .2;
-        zscat.MarkerEdgeAlpha = .2;
-        axis equal
-    end
     
+    x_hist(1:nx,i) = x0;
     
     [ A, l ] = update_dist_constraint(A, l, N, nx, nu, o_states, min_dist, xN);
     
     l(1:nx) = -x0;
     u(1:nx) = -x0;
-%     prob.update('l',l, 'u',u, 'Ax',A); updating A throws an error
+    
     prob.update('l',l, 'u',u);
+%     
     prob.update('Ax', nonzeros(A));
     
-    axis equal
+        
+        
+    if (VIS_ON)
+        hold on
+        plot(x0(1),x0(2), 'r.', 'MarkerSize', 20)
+        for j = 2:3
+            x1 = Ad * x1 + Bd * ctrls(:, j);
+            x_hist(nx*(j-1)+1:nx*j, i) = x1;
+            zscat = scatter(x1(1),x1(2), 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'b');
+            zscat.MarkerFaceAlpha = .2;
+            zscat.MarkerEdgeAlpha = .2;
+        end
+        axis equal
+    end
     
 end
 
+
+
+
 function [ A, l ] = update_dist_constraint(A, l, N, nx, nu, no, min_dist, x)
-   
-%     min_dist = 0.3;
     [ m, n ] = size(A);
     start_idx = m - N - 1; % i = start_idx + k
     
@@ -193,28 +191,20 @@ function [ A, l ] = update_dist_constraint(A, l, N, nx, nu, no, min_dist, x)
     % reset last N+1 constraints
     A(end-N:end,:) = zeros(N+1, n);
     
-%     lineq = [ repmat( xmin, N+1, 1); repmat( umin, N, 1); zeros(2,1) ];
     l(end-N:end) = min_dist * ones( N+1, 1 );
    
-%     uineq = [ repmat( xmax, N+1, 1); repmat( umax, N, 1); zeros(2,1) ];
-%     uineq = [ unieq; inf * ones(N+1, 1) ];
-    
-    
     for k = 1:N+1
         
         state_k = x( (k-1)*nx + 1 : k*nx );
         x_ij = state_k(1:2) - obj_xy;
         x_norm = norm(x_ij,2);
-        eta = x_ij / x_norm;
         
-        
-        T = eta' * [ eye(2), -eye(2) ];
+        eta = x_ij / x_norm;    
+            
+        T = eta' * [ eye(no), -eye(no) ];
         A( start_idx + k, [ (k-1)*nx + 1 : (k-1)*nx + 2, (N+1)*nx + 1 : (N+1)*nx + no ] ) = T;
-%         lineq( start_idx + k ) = lineq( start_idx + k ) - x_norm; % + 0
-%         lineq( start_idx + k ) = lineq( start_idx + k );
     end
 end
-
 
 
 
