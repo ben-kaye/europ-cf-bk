@@ -194,20 +194,27 @@ axis equal
 function [ A, l ] = compute_linear_constrs(A, l, N, nx, nu, no, min_dists, x)
     [ m, n ] = size(A);
     start_idx = m - N - 1; % i = start_idx + k
-    
+
+    % get obj coords
     obj_xy = x((N+1)*nx + 1:(N+1)*nx + no);
-    
+
+    % assign dists to <= cstr
     l(end-N:end) = min_dists;
-   
+
+    % for each time step
     for k = 1:N+1
-        
+        % get state at k
         state_k = x( (k-1)*nx + 1 : k*nx );
+
+        % get vec to obj
         x_ij = state_k(1:2) - obj_xy;
         x_norm = norm(x_ij,2);
-        
+
         eta = x_ij / x_norm;    
-            
+
         T = eta' * [ eye(no), -eye(no) ];
+
+        % assign to A where Ax>=l
         A( start_idx + k,...
             [ (k-1)*nx + 1 : (k-1)*nx + 2, (N+1)*nx + 1 : (N+1)*nx + no ] )...
             = T;
