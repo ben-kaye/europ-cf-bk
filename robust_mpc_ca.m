@@ -12,7 +12,19 @@
 
 clear,clc
 
+% PARAMETERS
 VIS_ON = 1;
+N = 15;
+N_OBJ_STATES = 2;
+MIN_DIST = 0.05;
+IDEAL_DIST = 0.3;
+EPSILON = [ 0.1 0.5 1 ];
+SIM_TIME = 20;
+
+% initial conditions
+ref = [ 2; 0.5; 0; 0; 0; 0 ];
+x0 = [ 0.1; 0.1; 0; 0; 0; 0 ];
+obj_xy = [ 1; 0.5 ];
 
 % System State-Space
 
@@ -32,19 +44,15 @@ Bd = [   0.00370875152761323,    0;
         0,                      -0.193245482770890;
         0.193245482770890,      0                       ];
 
+% augmented state no.
+Nstates = (N+1)*nx + N*nu + N_OBJ_STATES;    
+    
 [nx, nu] = size(Bd);    
     
-% initial conditions
-ref = [ 2; 0.5; 0; 0; 0; 0 ];
-x0 = [ 0.1; 0.1; 0; 0; 0; 0 ];
 
-obj_xy = [1;0.5];
-min_dist = 0.05;
-maxmin_dist = 0.3;
 
 % predictive horizon
-N = 15;
-o_states = 2;
+
 
 % constraints
 umin = [ -1; -1 ];
@@ -56,12 +64,12 @@ xmax = [ inf; inf; +2; +2; inf; inf ];
 % LQ objective
 Q = diag([1 1 0.1 0.1 0 0]);
 QN = Q;
-R = 0.01 * eye(2);
+R = 0.01 * eye(nu);
 
 % Augmented Quadratic Objective
-P = blkdiag( kron(speye(N), Q ), QN, zeros(o_states), kron(speye(N), R));
+P = blkdiag( kron(speye(N), Q ), QN, zeros(N_OBJ_STATES), kron(speye(N), R));
 % Augmented Linear Objective
-q = [ repmat( -Q*ref, N, 1 ); -QN*ref; zeros(o_states,1); zeros(N*nu, 1)];
+q = [ repmat( -Q*ref, N, 1 ); -QN*ref; zeros(N_OBJ_STATES,1); zeros(N*nu, 1)];
 % q = zeros( nx*(N+1) + N*nu, 1 );
 
 
@@ -71,37 +79,29 @@ Ax = kron( speye(N+1), -speye(nx) ) +...
 Bu = kron( [ sparse(1, N); speye(N) ], Bd );
 
 % append dynamics of object = stationary
-Ax = blkdiag(Ax, -speye(o_states));
-Bu = [Bu; zeros(o_states,size(Bu, 2))];
+Ax = blkdiag(Ax, -speye(N_OBJ_STATES));
+Bu = [Bu; zeros(N_OBJ_STATES, size(Bu, 2))];
 
 Aeq = [ Ax, Bu ];
 
-% should it be -ve or +ve
 leq = [ -x0; zeros(N*nx, 1); -obj_xy ];
 ueq = leq;
 xN = leq;
-% input and state constraints
 
-% augmented state no.
-Nstates = (N+1)*nx + N*nu + o_states;
+
+% input and state constraints
 
 Aineq = speye( Nstates );
 
-lineq = [ repmat( xmin, N+1, 1); -inf*ones(o_states, 1); repmat( umin, N, 1)  ];
-uineq = [ repmat( xmax, N+1, 1); +inf*ones(o_states, 1); repmat( umax, N, 1) ];
+lineq = [ repmat( xmin, N+1, 1); -inf*ones(N_OBJ_STATES, 1); repmat( umin, N, 1)  ];
+uineq = [ repmat( xmax, N+1, 1); +inf*ones(N_OBJ_STATES, 1); repmat( umax, N, 1) ];
 
-% [ Aineq, lineq ] = update_dist_constraint(Aineq, lineq, N, nx, nu, min_dist, [x0; zeros(Nstates - nx -nu -2, 1)]);
-
-
-Aplus = [ kron(speye(N+1), [ 1 1 0 0 0 0]), -ones(N+1, o_states), zeros(N+1, N*nu) ];
+Aconstr = [ kron(speye(N+1), [ 1 1 0 0 0 0]), -ones(N+1, N_OBJ_STATES), zeros(N+1, N*nu) ];
 
 % osqp constraints
-A = [ Aeq; Aineq; Aplus ];
+A = [ Aeq; Aineq; Aconstr ];
 l = [ leq; lineq; -inf*ones((N+1), 1) ];
 u = [ ueq; uineq; inf*ones((N+1), 1)];
-
-% [ A, l ] = update_dist_constraint(A, l, N, nx, nu, o_states, min_dist, Nx);
-
 
 
 % osqp init and setup
@@ -116,7 +116,7 @@ if (VIS_ON)
     hold on
     plot(ref(1), ref(2), 'rx', 'MarkerSize', 30, 'DisplayName', 'End')
     plot(obj_xy(1), obj_xy(2), 'r+', 'DisplayName', 'Radius of Avoidance')
-    viscircles(obj_xy', min_dist)
+    viscircles(obj_xy', MIN_DIST)
 
     xlabel('x (m)')
     ylabel('y (m)')
@@ -125,37 +125,34 @@ end
 
 error_count = 0;
 
-simtime = 20;
+x_hist = zeros((N+1)*nx, SIM_TIME);
 
-x_hist = zeros((N+1)*nx, simtime);
-
-param = [ 0.1 0.5 1 ];
-
-
+% solve unconstrained problem
 res = prob.solve();
 xN = res.x;
-vis_predicted_path
-for e = param
+
+for e = EPSILON
     
     relaxation_params = e * ones(N+1, 1);
     
-    dists = min_dist * ( ones(N+1,1) - relaxation_params ) + maxmin_dist * relaxation_params;
+    dists = MIN_DIST * ( ones(N+1,1) - relaxation_params ) + IDEAL_DIST * relaxation_params;
     
-    [ A, l ] = update_dist_constraint(A, l, N, nx, nu, o_states, dists, xN);
+    [ A, l ] = compute_linear_constrs(A, l, N, nx, nu, N_OBJ_STATES, dists, xN);
     
     prob.update('l',l, 'Ax', nonzeros(A));
     
     res = prob.solve();
     xN = res.x;
     
-    viscircles(obj_xy', dists(1));
-    vis_predicted_path    
+%     viscircles(obj_xy', dists(1));
+%     vis_predicted_path    
 end
 
 
-for i = 1 : simtime
+for i = 1 : SIM_TIME
     
     res = prob.solve();
+    % record result if solved
     if ~strcmp(res.info.status, 'solved')
             error_count = error_count + 1;                
     else 
@@ -163,57 +160,44 @@ for i = 1 : simtime
         xN = res.x;
     end 
    
-    
-    ctrls = xN( (N+1)*nx + o_states + 1 : end );
+    % get control actions
+    ctrls = xN( (N+1)*nx + N_OBJ_STATES + 1 : end );
     ctrls = reshape(ctrls, [nu, N]);
     
-    %in event of unsolvable path, carry on with previously calculated
-    %optimal path
+    % in event of unsolvable path, carry on with previously calculated
+    % optimal path
     ctrl = ctrls(:, 1 + error_count);
     
+    % activate control
     x0 = Ad * x0 + Bd * ctrl;
-    x1 = x0;
     
+    % store state
     x_hist(1:nx,i) = x0;
     
-    [ A, l ] = update_dist_constraint(A, l, N, nx, nu, o_states, dists, xN);
+    % compute linear constraints
+    [ A, l ] = compute_linear_constrs(A, l, N, nx, nu, N_OBJ_STATES, dists, xN);
     
+    % update initial conds and constraints
     l(1:nx) = -x0;
     u(1:nx) = -x0;
     
     prob.update('l',l, 'u',u);
-%     
     prob.update('Ax', nonzeros(A));
-    
-        
-        
-%     if (VIS_ON)
-%         hold on
-%         plot(x0(1),x0(2), 'r.', 'MarkerSize', 20)
-%         for j = 2:3
-%             x1 = Ad * x1 + Bd * ctrls(:, j);
-%             x_hist(nx*(j-1)+1:nx*j, i) = x1;
-%             zscat = scatter(x1(1),x1(2), 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'b');
-%             zscat.MarkerFaceAlpha = .2;
-%             zscat.MarkerEdgeAlpha = .2;
-%         end
-%         axis equal
-%     end
-    
+  
+  
 end
 
+% plot results
 plot(x_hist(1,:), x_hist(2,:), '.', 'MarkerSize', 20, 'Color', 1/255*[73, 146, 214], 'DisplayName', 'Path Taken')
 axis equal
 
-
-
-function [ A, l ] = update_dist_constraint(A, l, N, nx, nu, no, min_dist, x)
+function [ A, l ] = compute_linear_constrs(A, l, N, nx, nu, no, min_dists, x)
     [ m, n ] = size(A);
     start_idx = m - N - 1; % i = start_idx + k
     
     obj_xy = x((N+1)*nx + 1:(N+1)*nx + no);
     
-    l(end-N:end) = min_dist;
+    l(end-N:end) = min_dists;
    
     for k = 1:N+1
         
@@ -224,7 +208,9 @@ function [ A, l ] = update_dist_constraint(A, l, N, nx, nu, no, min_dist, x)
         eta = x_ij / x_norm;    
             
         T = eta' * [ eye(no), -eye(no) ];
-        A( start_idx + k, [ (k-1)*nx + 1 : (k-1)*nx + 2, (N+1)*nx + 1 : (N+1)*nx + no ] ) = T;
+        A( start_idx + k,...
+            [ (k-1)*nx + 1 : (k-1)*nx + 2, (N+1)*nx + 1 : (N+1)*nx + no ] )...
+            = T;
     end
 end
 
