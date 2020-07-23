@@ -10,5 +10,5 @@ robust_mpc_ca.m &nbsp; &nbsp; &nbsp;  &nbsp; &nbsp; &nbsp; &nbsp;Improved MPC wi
 ndrone_mpcca.m &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; N-Drones MPC CA<br/>
 
 ## Simulink
-quadcop_simulator.slx
+quadcop_simulator.slx <br/>
 crazyflie_controller_ak.mdl
