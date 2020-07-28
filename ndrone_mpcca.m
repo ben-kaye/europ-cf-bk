@@ -14,12 +14,12 @@ clear,clc
 
 % PARAMETERS
 VIS_ON = 1; % display graphs
-N = 15; % Horizon
+N = 5; % Horizon
 M = 2; % Number of drones
 MIN_DIST = 0.05; % Absolute min
 IDEAL_DIST = 0.3; % Ideal range
 EPSILON = [ 0.1 0.5 1 ];
-SIM_TIME = 20; % Number of iterations in simulation (linear sim)
+SIM_TIME = 39; % Number of iterations in simulation (linear sim)
 
 % initial conditions
 ref = [ 1,  1;
@@ -28,13 +28,15 @@ ref = [ 1,  1;
         0,  0;
         0,  0;
         0,  0 ];
-x0 = [  -1, -1;
+xinit = [  -1, -1;
         1,  -1;
         0,  0;
         0,  0;
         0,  0;
         0,  0   ];
 
+x0 = xinit;    
+    
 % System State-Space
 
 % d_system.A([1:2, 4:5, 7:8], [1:2, 4:5, 7:8])
@@ -88,7 +90,6 @@ Aeq = [ Ax, Bu ];
 
 leq = [ -x0(:,1); zeros(N*nx, 1); -x0(:,2); zeros(N*nx,1) ];
 ueq = leq;
-xN = leq;
 
 
 lineq = [ repmat( xmin, N+1, 1); repmat( umin, N, 1)  ];
@@ -107,11 +108,15 @@ Aineq = speye( M * Nstates );
 
 % Aconstr = [ kron(speye(N+1), [ 1 1 0 0 0 0]), -ones(N+1, N_OBJ_STATES), zeros(N+1, N*nu) ];
 
-% osqp constraints
-A = [ Aeq; Aineq ];
-l = [ leq; lineq ];
-u = [ ueq; uineq ];
+N_ca_constrs = (N+1)*nchoosek(M,2);
 
+% osqp constraints
+
+l = [ leq; lineq; -inf*ones(N_ca_constrs, 1)];
+u = [ ueq; uineq; inf*ones(N_ca_constrs, 1)];
+
+A = [ Aeq; Aineq; zeros(N_ca_constrs, size(Aeq,2)) ];
+A = make_placeholder_A(A,M,N,nx,nu);
 
 % osqp init and setup
 prob = osqp;
@@ -119,23 +124,11 @@ prob.setup( P, q, A, l, u, 'warm_start', true, 'verbose', false );
 
 % simulate
 
-if (VIS_ON)
-    figure(1)
-    plot(x0(1,1), x0(2,1), '+', 'MarkerSize', 30, 'DisplayName', 'A1 Start', 'Color', 1/255*[73, 146, 214])
-    hold on
-    plot(x0(1,2), x0(2,2), '+', 'MarkerSize', 30, 'DisplayName', 'A2 Start', 'Color', 1/255*[214, 88, 149])
-    plot(ref(1,1), ref(2,1), 'x', 'MarkerSize', 30, 'DisplayName', 'A1 End', 'Color', 1/255*[73, 146, 214])
-    plot(ref(1,2), ref(2,2), 'x', 'MarkerSize', 30, 'DisplayName', 'A2 End', 'Color', 1/255*[214, 88, 149])
-
-
-    xlabel('x (m)')
-    ylabel('y (m)')
-    title('Drone at time kT, T=0.1s')
-end
+dists = IDEAL_DIST*ones((N+1)*nchoosek(M,2), 1);
 
 error_count = 0;
 
-x_hist = zeros((N+1)*nx, SIM_TIME);
+x_hist = zeros(M*nx, SIM_TIME);
 
 % solve unconstrained problem
 res = prob.solve();
@@ -164,69 +157,78 @@ for i = 1 : SIM_TIME
     res = prob.solve();
     % record result if solved
     if ~strcmp(res.info.status, 'solved')
-            error_count = error_count + 1;                
+            error_count = error_count + 1; 
+            if error_count >= N
+                error_count = N-1;
+                fprintf('MAJOR ERROR')
+            end
     else 
         error_count = 0;
         xN = res.x;
     end 
    
-    % get control actions
-    ctrls0 = xN((N+1)*nx+1 : (N+1)*nx+N*nu );
-    ctrls1 = xN(2*(N+1)*nx + N*nu + 1: 2*((N+1)*nx + N*nu));
-    
-    ctrls0 = reshape(ctrls0, [nu, N]);
-    ctrls1 = reshape(ctrls1, [nu, N]);
-    
-    %in event of unsolvable path, carry on with previously calculated
-    %optimal path
-    ctrl0 = ctrls0(:, 1 + error_count);
-    ctrl1 = ctrls1(:, 1 + error_count);
-    
-    ctrl_act = [ ctrl0, ctrl1 ];
-    
+    % get control actions    
+    ctrls = zeros(N*nu, M);
+    ctrl_act = zeros(nu, M);
+    for g = 1:M
+        ctrls(:,g) = xN( g*((N+1)*nx)+ (g-1)* N*nu+ 1: g*((N+1)*nx)+ g*N*nu);
+        % if solve error, continue with previous
+        ctrl_act(:, g) = ctrls( 1 + error_count*nu : (1+error_count)*nu, g);
+    end
+
     % activate control
     x0 = Ad * x0 + Bd * ctrl_act;
     
     % store state
-    x_hist(1:2*nx,i) = reshape(x0, 2*nx, []);
+    x_hist(1:M*nx,i) = reshape(x0, M*nx, []);
     
     % compute linear constraints
-%     [ A, l ] = compute_linear_constrs(A, l, N, nx, nu, N_OBJ_STATES, dists, xN);
+    [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, dists, xN);
     
     % update initial conds and constraints
     
-    xtemp = reshape(x0, 2*nx, []);
-    l([1:nx, Nstates+1:Nstates+nx]) = -xtemp;
-    u([1:nx, Nstates+1:Nstates+nx]) = -xtemp;
+    leq = [];
+    for h = 1:M
+        leq = [ leq;
+                -x0(:,h); zeros(N*nx, 1) ];
+    end
+    
+    l(1:M*(N+1)*nx) = leq;
+    u(1:M*(N+1)*nx) = leq;
     
     prob.update('l',l, 'u',u);
-%     prob.update('Ax', nonzeros(A));
+    prob.update('Ax', nonzeros(A));
 %   
   
 end
 
+color = zeros(3, M);
+color(:, 1) = 1/255*[73, 146, 214];
+color(:, 2) = 1/255*[214, 88, 149];
+
 % plot results
-plot(x_hist(1,:), x_hist(2,:), '.', 'MarkerSize', 20, 'Color', 1/255*[73, 146, 214], 'DisplayName', 'A1 Path Taken')
-plot(x_hist(7,:), x_hist(8,:), '.', 'MarkerSize', 20, 'Color', 1/255*[214, 88, 149], 'DisplayName', 'A2 Path Taken')
-axis equal
+if (VIS_ON)
+    figure(1)
+    hold on
+    for z = 1 : M        
+        plot(xinit(1,z), xinit(2,z), '+', 'MarkerSize', 30, 'DisplayName', sprintf('A%d Start',z), 'Color', color(:,z));
+        plot(ref(1,z), ref(2,z), 'x', 'MarkerSize', 30, 'DisplayName', sprintf('A%d End',z), 'Color', color(:,z));
+        plot(x_hist(nx*(z-1)+1,:), x_hist(nx*(z-1)+2,:), '.', 'MarkerSize', 20, 'Color', color(:,z), 'DisplayName', sprintf('A%d Path Taken',z))
+    end
+    axis equal
+    xlabel('x (m)')
+    ylabel('y (m)')
+    title('Drone at time kT, T=0.1s')
+    legend()
+end
+
+
+
 
 function [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, min_dists, x)
-   
-%     min_dist = 0.3;
-%     [ m, n ] = size(A);
-    start_idx = 136;
-    % WORK OUT FORMULA FOR
-    
-    
     n_states = (N+1)*nx + N*nu;
-    
-%     Aineq = blkdiag(speye( (N+1)*nx + N*nu ), zeros(2));
-    % reset last N+1 constraints
-%     A(end-N:end,:) = zeros(N+1, n);
-
-    %NOT TRUE should be M Comb 2 
-    
-    
+    start_idx = 2*M*(N+1)*nx + M*N*nu;
+        
     l(end-(N+1)*nchoosek(M,2)+1:end) = min_dists;
     
     for idx_i = 1:M
@@ -255,7 +257,23 @@ function [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, min_dists, x)
     end
 end
 
-
+function [ A ] = make_placeholder_A(A, M, N, nx, nu) 
+    start_idx = 2*M*(N+1)*nx + M*N*nu;
+    for idx_i = 1:M
+        for idx_j = 1:M
+            if( idx_j > idx_i)                
+                for k = 1:N+1
+                    T = [ ones(1,2), -ones(1,2) ];
+                    
+                    A( start_idx+k+(idx_i+idx_j-3)*(N+1),...
+                        [ ((N+1)*nx + N*nu)*(idx_i-1) + (k-1)*nx + 1 : ((N+1)*nx + N*nu)*(idx_i-1) + (k-1)*nx + 2,...
+                        ((N+1)*nx + N*nu)*(idx_j-1) + (k-1)*nx + 1 : ((N+1)*nx + N*nu)*(idx_j-1) + (k-1)*nx + 2]) = T;
+                    
+                end
+            end
+        end
+    end
+end
 
 
 

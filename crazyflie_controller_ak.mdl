@@ -1,7 +1,7 @@
 Model {
-  Name			  "controller"
+  Name			  "crazyflie_controller_ak"
   Version		  10.1
-  SavedCharacterEncoding  "UTF-8"
+  SavedCharacterEncoding  "windows-1252"
   GraphicalInterface {
     NumRootInports	    1
     Inport {
@@ -26,7 +26,7 @@ Model {
       UnitExpr		      "inherit"
     }
     ParameterArgumentNames  ""
-    ComputedModelVersion    "1.2051"
+    ComputedModelVersion    "1.2052"
     NumModelReferences	    0
     NumTestPointedSignals   0
     NumProvidedFunctions    0
@@ -42,12 +42,12 @@ Model {
     NumExternalFileReferences 0
     OrderedModelArguments   1
   }
+  DiagnosticSuppressor	  "on"
+  AnimationPlugin	  "on"
+  LogicAnalyzerPlugin	  "on"
+  SLCCPlugin		  "on"
   WebScopes_FoundationPlugin "on"
   NotesPlugin		  "on"
-  AnimationPlugin	  "on"
-  DiagnosticSuppressor	  "on"
-  SLCCPlugin		  "on"
-  LogicAnalyzerPlugin	  "on"
   EnableAccessToBaseWorkspace on
   ScopeRefreshTime	  0.035000
   OverrideScopeRefreshTime off
@@ -58,7 +58,7 @@ Model {
   MinMaxOverflowArchiveMode "Overwrite"
   FPTRunName		  "Run 1"
   MaxMDLFileLineLength	  120
-  LastSavedArchitecture	  "maci64"
+  LastSavedArchitecture	  "win64"
   Object {
     $PropName		    "BdWindowsInfo"
     $ObjectID		    1
@@ -95,10 +95,10 @@ Model {
 	  IsTabbed		  [1]
 	  ViewObjType		  "SimulinkTopLevel"
 	  LoadSaveID		  "0"
-	  Extents		  [1402.0, 602.0]
-	  ZoomFactor		  [0.59999999999999987]
-	  Offset		  [-752.12134886225931, 135.23218754876277]
-	  SceneRectInView	  [-752.12134886225931, 135.23218754876277, 2336.666666666667, 1003.3333333333336]
+	  Extents		  [2784.0, 1221.0]
+	  ZoomFactor		  [0.59572039942938648]
+	  Offset		  [-752.12134886225931, 124.49404099703861]
+	  SceneRectInView	  [-752.12134886225931, 124.49404099703861, 2336.666666666667, 1024.8096264367819]
 	}
 	Object {
 	  $ObjectID		  6
@@ -135,15 +135,15 @@ Model {
 	UserData		""
 	Floating		[0]
 	DockPosition		"Right"
-	Width			[640]
-	Height			[480]
+	Width			[320]
+	Height			[240]
 	Minimized		"Unset"
       }
       WindowState	      "AAAA/wAAAAD9AAAAAgAAAAAAAAC9AAAB+PwCAAAAA/sAAAAWAEQAbwBjAGsAVwBpAGQAZwBlAHQAMwEAAAAxAAAB+AAAA"
       "AAAAAAA+wAAABYARABvAGMAawBXAGkAZABnAGUAdAA0AAAAAAD/////AAAAAAAAAAD7AAAAUgBHAEwAVQBFADIAIAB0AHIAZQBlACAAYwBvAG0Ac"
-      "ABvAG4AZQBuAHQALwBHAEwAVQBFADIAIAB0AHIAZQBlACAAYwBvAG0AcABvAG4AZQBuAHQAAAAAAP////8AAABrAP///wAAAAEAAAAAAAAAAPwCA"
+      "ABvAG4AZQBuAHQALwBHAEwAVQBFADIAIAB0AHIAZQBlACAAYwBvAG0AcABvAG4AZQBuAHQAAAAAAP////8AAAD0AP///wAAAAEAAAAAAAAAAPwCA"
       "AAAAfsAAABUAEcATABVAEUAMgA6AFAAcgBvAHAAZQByAHQAeQBJAG4AcwBwAGUAYwB0AG8AcgAvAFAAcgBvAHAAZQByAHQAeQAgAEkAbgBzAHAAZ"
-      "QBjAHQAbwByAAAAAAD/////AAABrAD///8AAAWgAAAClwAAAAEAAAACAAAAAQAAAAL8AAAAAQAAAAIAAAAA"
+      "QBjAHQAbwByAAAAAAD/////AAADVAD///8AAAsmAAAFIAAAAAEAAAACAAAAAQAAAAL8AAAAAQAAAAIAAAAA"
       Array {
 	Type			"Cell"
 	Dimension		0
@@ -158,11 +158,11 @@ Model {
   Creator		  "kimal and jseitz"
   UpdateHistory		  "UpdateHistoryNever"
   ModifiedByFormat	  "%<Auto>"
-  LastModifiedBy	  "Karapetyan"
+  LastModifiedBy	  "Ben"
   ModifiedDateFormat	  "%<Auto>"
-  LastModifiedDate	  "Thu Apr 09 15:06:48 2020"
-  RTWModifiedTimeStamp	  508345605
-  ModelVersionFormat	  "1.%<AutoIncrement:2051>"
+  LastModifiedDate	  "Fri Jul 24 15:13:32 2020"
+  RTWModifiedTimeStamp	  517504409
+  ModelVersionFormat	  "1.%<AutoIncrement:2052>"
   SampleTimeColors	  on
   SampleTimeAnnotations	  off
   LibraryLinkDisplay	  "disabled"
@@ -222,12 +222,12 @@ Model {
     $PropName		    "DataLoggingOverride"
     $ObjectID		    9
     $ClassName		    "Simulink.SimulationData.ModelLoggingInfo"
-    model_		    "controller"
+    model_		    "crazyflie_controller_ak"
     overrideMode_	    [0.0]
     Array {
       Type		      "Cell"
       Dimension		      1
-      Cell		      "controller"
+      Cell		      "crazyflie_controller_ak"
       PropName		      "logAsSpecifiedByModels_"
     }
     Array {
@@ -1352,7 +1352,7 @@ Model {
     }
   }
   System {
-    Name		    "controller"
+    Name		    "crazyflie_controller_ak"
     Location		    [-11, 225, 1429, 1056]
     Open		    on
     PortBlocksUseCompactNotation off
@@ -1854,7 +1854,7 @@ Model {
       SID		      "3900"
       Position		      [820, 235, 850, 265]
       ZOrder		      977
-      Gain		      "cmd_2_newtons_conversion_linear_coefficient*nrotor_vehicle_thrust_max"
+      Gain		      "c2*maxthrust"
     }
     Block {
       BlockType		      Gain
@@ -1862,7 +1862,7 @@ Model {
       SID		      "3901"
       Position		      [820, 275, 850, 305]
       ZOrder		      978
-      Gain		      "cmd_2_newtons_conversion_linear_coefficient*nrotor_vehicle_thrust_max"
+      Gain		      "c1*maxthrust"
     }
     Block {
       BlockType		      Gain
@@ -3013,7 +3013,7 @@ Model {
       BackgroundColor	      "[0.901961, 0.901961, 1.000000]"
       DropShadow	      on
       AnnotationType	      "area_annotation"
-      ZOrder		      1881
+      ZOrder		      1887
       FontSize		      12
     }
     Annotation {
@@ -3024,7 +3024,7 @@ Model {
       "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-inden"
       "t:0px;\"><span style=\" font-family:'Liberation Sans'; font-size:20px; font-weight:600;\">CF Model</span></p></b"
       "ody></html>"
-      Position		      [639, -433, 735, -407]
+      Position		      [639, -433, 732, -407]
       InternalMargins	      [0, 0, 0, 0]
       HorizontalAlignment     "left"
       VerticalAlignment	      "top"
@@ -3044,7 +3044,7 @@ Model {
       BackgroundColor	      "[0.901961, 0.901961, 1.000000]"
       DropShadow	      on
       AnnotationType	      "area_annotation"
-      ZOrder		      1882
+      ZOrder		      1888
       FontSize		      12
     }
     Annotation {
@@ -3091,7 +3091,7 @@ Model {
       "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-inden"
       "t:0px; line-height:100%;\"><span style=\" font-family:'Liberation Sans'; font-size:20px; font-weight:600;\">CONT"
       "ROLLER</span></p></body></html>"
-      Position		      [-1210, -258, -1069, -232]
+      Position		      [-1210, -258, -1073, -232]
       InternalMargins	      [0, 0, 0, 0]
       HorizontalAlignment     "left"
       VerticalAlignment	      "top"
@@ -3106,7 +3106,7 @@ Model {
       "l;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; tex"
       "t-indent:0px; line-height:100%;\"><span style=\" font-size:20px; font-weight:600;\">OUTER CONTROLLER</span></p><"
       "/body></html>"
-      Position		      [-730, 2, -512, 28]
+      Position		      [-730, 2, -517, 28]
       InternalMargins	      [0, 0, 0, 0]
       HorizontalAlignment     "left"
       VerticalAlignment	      "top"
@@ -3126,7 +3126,7 @@ Model {
       BackgroundColor	      "[0.901961, 0.901961, 1.000000]"
       DropShadow	      on
       AnnotationType	      "area_annotation"
-      ZOrder		      1884
+      ZOrder		      1890
       FontSize		      12
     }
     Annotation {
@@ -3142,7 +3142,7 @@ Model {
       BackgroundColor	      "[0.901961, 0.901961, 1.000000]"
       DropShadow	      on
       AnnotationType	      "area_annotation"
-      ZOrder		      1885
+      ZOrder		      1891
       FontSize		      12
     }
     Annotation {
@@ -3158,7 +3158,7 @@ Model {
       BackgroundColor	      "[0.901961, 0.901961, 1.000000]"
       DropShadow	      on
       AnnotationType	      "area_annotation"
-      ZOrder		      1886
+      ZOrder		      1892
       FontSize		      12
     }
     Annotation {
@@ -3174,7 +3174,7 @@ Model {
       BackgroundColor	      "[0.901961, 0.901961, 1.000000]"
       DropShadow	      on
       AnnotationType	      "area_annotation"
-      ZOrder		      1883
+      ZOrder		      1889
       FontSize		      12
     }
   }
@@ -3187,7 +3187,7 @@ Model {
 Stateflow {
   machine {
     id			    1
-    name		    "controller"
+    name		    "crazyflie_controller_ak"
     sfVersion		    80000032
     firstTarget		    2
   }

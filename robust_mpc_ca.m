@@ -17,7 +17,7 @@ VIS_ON = 1;
 N = 15;
 N_OBJ_STATES = 2;
 MIN_DIST = 0.05;
-IDEAL_DIST = 0.3;
+IDEAL_DIST = 0.7;
 EPSILON = [ 0.1 0.5 1 ];
 SIM_TIME = 20;
 
@@ -44,10 +44,12 @@ Bd = [   0.00370875152761323,    0;
         0,                      -0.193245482770890;
         0.193245482770890,      0                       ];
 
+    
+[nx, nu] = size(Bd);     
 % augmented state no.
 Nstates = (N+1)*nx + N*nu + N_OBJ_STATES;    
     
-[nx, nu] = size(Bd);    
+   
     
 
 
@@ -131,6 +133,7 @@ x_hist = zeros((N+1)*nx, SIM_TIME);
 res = prob.solve();
 xN = res.x;
 
+vis_predicted_path
 for e = EPSILON
     
     relaxation_params = e * ones(N+1, 1);
@@ -145,7 +148,7 @@ for e = EPSILON
     xN = res.x;
     
 %     viscircles(obj_xy', dists(1));
-%     vis_predicted_path    
+    vis_predicted_path    
 end
 
 

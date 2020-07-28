@@ -14,12 +14,12 @@ clear,clc
 
 % PARAMETERS
 VIS_ON = 1; % display graphs
-N = 5; % Horizon
+N = 30; % Horizon
 M = 3; % Number of drones
 MIN_DIST = 0.05; % Absolute min
-IDEAL_DIST = 0.3; % Ideal range
+IDEAL_DIST = 0.4; % Ideal range
 EPSILON = [ 0.1 0.5 1 ];
-SIM_TIME = 50; % Number of iterations in simulation (linear sim)
+SIM_TIME = 45; % Number of iterations in simulation (linear sim)
 
 % initial conditions
 ref = [ 1,  1,  -1;
@@ -118,8 +118,6 @@ P = kron( speye(M), P) ;
 
 Aineq = speye( M * Nstates );
 
-% Aconstr = [ kron(speye(N+1), [ 1 1 0 0 0 0]), -ones(N+1, N_OBJ_STATES), zeros(N+1, N*nu) ];
-
 N_ca_constrs = (N+1)*nchoosek(M,2);
 
 % osqp constraints
@@ -148,22 +146,6 @@ x_hist = zeros((N+1)*nx, SIM_TIME);
 res = prob.solve();
 xN = res.x;
 
-% for e = EPSILON
-%     
-%     relaxation_params = e * ones(N+1, 1);
-%     
-%     dists = MIN_DIST * ( ones(N+1,1) - relaxation_params ) + IDEAL_DIST * relaxation_params;
-%     
-%     [ A, l ] = compute_linear_constrs(A, l, N, nx, nu, N_OBJ_STATES, dists, xN);
-%     
-%     prob.update('l',l, 'Ax', nonzeros(A));
-%     
-%     res = prob.solve();
-%     xN = res.x;
-%     
-% %     viscircles(obj_xy', dists(1));
-% %     vis_predicted_path    
-% end
 
 
 for i = 1 : SIM_TIME
@@ -171,7 +153,13 @@ for i = 1 : SIM_TIME
     res = prob.solve();
     % record result if solved
     if ~strcmp(res.info.status, 'solved')
-            error_count = error_count + 1;                
+            [xN, err] = resolve_error(prob, A, l, M, N, nx, nu, MIN_DIST, IDEAL_DIST, EPSILON, xN);
+            if err
+                error_count = error_count + 1;
+                if error_count >= N
+                    error_count = N-1;
+                end
+            end
     else 
         error_count = 0;
         xN = res.x;
@@ -238,7 +226,36 @@ title('Drone at time kT, T=0.1s')
 legend()
 
 
-function [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, min_dists, x)
+function [x, err] = resolve_error(prob, A, l, M, N, nx, nu, MIN_DIST, IDEAL_DIST, EPSILON, x)
+    err = 0;
+%     [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, dists, xN);
+    for e = EPSILON
+
+        N_ca_constrs = (N+1)*nchoosek(M,2);
+        
+        relaxation_params = e * ones(N_ca_constrs, 1);
+
+        dists = MIN_DIST * ( ones(N_ca_constrs,1) - relaxation_params ) + IDEAL_DIST * relaxation_params;
+
+        [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, dists, x);
+
+        prob.update('l',l, 'Ax', nonzeros(A));
+        
+        res = prob.solve();
+        
+        if ~strcmp(res.info.status, 'solved')
+            err = 1;
+        else
+            x = res.x;
+        end
+        
+    end
+
+    
+end
+
+function [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, min_dists, x, rotate)
+% rotate ~= 0 -> apply 60deg rotation to etas
     n_states = (N+1)*nx + N*nu;
     start_idx = 2*M*(N+1)*nx + M*N*nu;
         
@@ -257,7 +274,11 @@ function [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, min_dists, x)
                     x_ji = x_ik(1:2) - x_jk(1:2);
                     x_norm = norm(x_ji,2);
                     eta = x_ji / x_norm;
-
+                    
+                    if rotate ~= 0
+                        eta = [ cosd(60), -sind(60); sind(60), cosd(60) ] * eta;
+                    end
+                    
                     T = eta' * [ eye(2), -eye(2) ];
                     
                     A(start_idx+k+(idx_i+idx_j-3)*(N+1),...
