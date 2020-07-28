@@ -1,9 +1,24 @@
 function cost = get_fitness(Q_weights, R_weights)
     step_info = get_step_info(Q_weights, R_weights);
     
+    Z = zeros(5,4);
+    
+    for h = 1:4
+        step = step_info{h};
+        Z(1, h) = step.RiseTime;
+        Z(2, h) = step.SettlingTime;
+        Z(3, h) = step.PeakTime;
+        Z(4, h) = step.Overshoot;
+        Z(5, h) = step.SSError;
+    end
+    
+    weights = [ 5 5 10 1 ];
+    
+    M = [ 30 5 5 1000 100 ];
+    
+    
     %implement formula
-    cost = 0; %linear comb of step_info
-
+    cost = weights*(M*Z)';
 end
 
 function step_info = get_step_info(Q_weights,R_weights)
@@ -32,7 +47,8 @@ for k = 1:4
     idx = find(t>=start_times(k),1);
     t_new = t(idx:end) - t(idx);
     y_trim = y(idx:end, k);
-    step_info{k} = stepinfo(y_trim,t_new);    
+    step_info{k} = stepinfo(y_trim,t_new);  
+    step_info{k}.SSError = abs(1 - y_trim(end));
 end
 
 end

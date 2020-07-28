@@ -15,18 +15,65 @@ e = 4; % no. elite patches
 nep = 10; % bees at elite patches
 nsp = 7; % bees at other patches
 
-ngh = 0.1; % radius of patch 
+ngh = 1; % radius of patch 
 kmax = 30; % max iters
 
-patches = {};
-scouts = {};
+patches = cell(1,m);
+scouts = cell(1,n);
 
 
 best_cost = inf;
-
+best_patch = -1;
+temp_cost = zeros(1, n);
 for g = 1:n
     scouts{g} = new_scout(Qwlower, Qwupper,Rwlower, Rwupper);    
+    temp_cost(g) = scouts{g}.Cost;
 end
+[~, I] = sort(temp_cost);
+elite_indices = I(1:e);
+patch_indices = I(e+1:m);
+
+
+for u = 1:e
+    patches{u} = make_patch(scouts{I(u)},ngh);
+    for b = 1:nep
+        patches{u}.Bees{b} = new_bee(patches{u});
+        if patches{u}.Bees{b}.Cost < patches{u}.Cost
+             patches{u}.Cost = patches{u}.Bees{b}.Cost;
+             patches{u}.Bdex = b;
+        end
+    end
+    if patches{u}.Bdex > -1
+        patches{u} = make_patch(patches{u}.Bees{patches{u}.Bdex}, patches{u}.Radius*0.6);
+    end
+    
+    if patches{u}.Cost < best_cost
+        best_cost = patches{u}.Cost;
+        best_patch = u;
+    end
+end
+
+for u = e+1:m
+    patches{u} = make_patch(scouts{I(u)},ngh);
+    for b = 1:nsp
+        patches{u}.Bees{b} = new_bee(patches{u});
+        if patches{u}.Bees{b}.Cost < patches{u}.Cost
+             patches{u}.Cost = patches{u}.Bees{b}.Cost;
+             patches{u}.Bdex = b;
+        end
+    end
+    if patches{u}.Bdex > -1
+        patches{u} = make_patch(patches{u}.Bees{patches{u}.Bdex}, patches{u}.Radius*0.6);
+    end
+    
+    if patches{u}.Cost < best_cost
+        best_cost = patches{u}.Cost;
+        best_patch = u;
+    end
+end
+
+
+
 
 function bee = new_bee(patch)
     r = patch.Radius;
@@ -49,13 +96,15 @@ function scout = new_scout(Qwlower, Qwupper, Rwlower, Rwupper)
     scout = struct('Qw',Qw,'Rw',Rw, 'Cost', cost);
 end
 
-function patch = make_patch(scout, nbees, radius)
+function patch = make_patch(scout, radius)
     center = scout.Qw;
     radius = ngh;
-    bees = {};
     best_cost = scout.cost;
+    best_index = -1;
+    bees = {};
     
-    patch = struct('Center', center, 'Radius', radius, 'Bees', bees, 'Cost', best_cost);
+    
+    patch = struct('Center', center, 'Radius', radius, 'Bees', bees, 'Cost', best_cost, 'Bdex',best_index);
 end
 
 function [Qactual, Ractual] = get_QR_actual(Qw, Rw)
