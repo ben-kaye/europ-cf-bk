@@ -44,7 +44,7 @@ for k = 1:4
     hold on
     stairs(step_response{k}(:,1),step_response{k}(:,2), 'DisplayName',labels{k},'LineWidth',2, 'Color', colour{k});
     step_info{k} = stepinfo(y_trim,t_new);
-    
+
 end
 
 qstr = [ 'Q=' sprintf('%.2f,', Q_weights) ];
