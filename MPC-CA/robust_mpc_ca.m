@@ -1,14 +1,15 @@
-% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-% *                                                               *
-% *                 Program by Ben Kaye (c) 2020                  *
-% *                         EUROP Project                         *
-% *                                                               *
-% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-% *                                                               *
-% *        Using CrazyFlie model provided by Aren Karapet         *
-% *                        and OSQP Solver                        *
-% *                                                               *
-% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% *                                                                     *
+% *                         Ben Kaye, (c) 2020                          *
+% *                           EUROP Project:                            *
+% *                               MPC-CA                                *
+% *                                                                     *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% *                                                                     *
+% *             CrazyFlie controller model by Aren Karapet              *
+% *                          Using OSQP Solver                          *
+% *                                                                     *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 clear,clc
 

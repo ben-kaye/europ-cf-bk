@@ -1,25 +1,26 @@
-% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-% *                                                               *
-% *                 Program by Ben Kaye (c) 2020                  *
-% *                         EUROP Project                         *
-% *                                                               *
-% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-% *                                                               *
-% *        Using CrazyFlie model provided by Aren Karapet         *
-% *                        and OSQP Solver                        *
-% *                                                               *
-% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% *                                                                     *
+% *                         Ben Kaye, (c) 2020                          *
+% *                           EUROP Project:                            *
+% *                               MPC-CA                                *
+% *                                                                     *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% *                                                                     *
+% *             CrazyFlie controller model by Aren Karapet              *
+% *                          Using OSQP Solver                          *
+% *                                                                     *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 clear,clc
 
 % PARAMETERS
 VIS_ON = 1; % display graphs
-N = 30; % Horizon
+N = 10; % Horizon
 M = 3; % Number of drones
 MIN_DIST = 0.05; % Absolute min
-IDEAL_DIST = 0.4; % Ideal range
+IDEAL_DIST = 0.3; % Ideal range
 EPSILON = [ 0.1 0.5 1 ];
-SIM_TIME = 45; % Number of iterations in simulation (linear sim)
+SIM_TIME = 30; % Number of iterations in simulation (linear sim)
 
 % initial conditions
 ref = [ 1,  1,  -1;
@@ -181,7 +182,7 @@ for i = 1 : SIM_TIME
     x_hist(1:M*nx,i) = reshape(x0, M*nx, []);
     
     % compute linear constraints
-    [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, dists, xN);
+    [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, dists, xN, 0);
     
     % update initial conds and constraints
     
@@ -237,7 +238,7 @@ function [x, err] = resolve_error(prob, A, l, M, N, nx, nu, MIN_DIST, IDEAL_DIST
 
         dists = MIN_DIST * ( ones(N_ca_constrs,1) - relaxation_params ) + IDEAL_DIST * relaxation_params;
 
-        [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, dists, x);
+        [ A, l ] = update_lin_constrs(A, l, M, N, nx, nu, dists, x, 0);
 
         prob.update('l',l, 'Ax', nonzeros(A));
         

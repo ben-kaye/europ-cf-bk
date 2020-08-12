@@ -13,9 +13,9 @@
 g = 9.81;
 m = 27e-3; % should use model params.. oh well
 Ts = 1/10;
-cmd_2_newtons_conversion_quadratic_coefficient  =  1.3385e-10;
-cmd_2_newtons_conversion_linear_coefficient     =  6.4870e-6;
-nrotor_vehicle_thrust_max = 0.1597;
+c2 = 1.3385e-10;
+c1 = 6.4870e-6;
+maxthrust = 0.1597;
 
 % LTI continuous-time system
 A = [   zeros(3),   eye(3),     zeros(3);

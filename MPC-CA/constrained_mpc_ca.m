@@ -1,14 +1,15 @@
-% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-% *                                                               *
-% *                 Program by Ben Kaye (c) 2020                  *
-% *                         EUROP Project                         *
-% *                                                               *
-% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-% *                                                               *
-% *        Using CrazyFlie model provided by Aren Karapet         *
-% *                        and OSQP Solver                        *
-% *                                                               *
-% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% *                                                                     *
+% *                         Ben Kaye, (c) 2020                          *
+% *                           EUROP Project:                            *
+% *                               MPC-CA                                *
+% *                                                                     *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% *                                                                     *
+% *             CrazyFlie controller model by Aren Karapet              *
+% *                          Using OSQP Solver                          *
+% *                                                                     *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 clear,clc
 
@@ -111,21 +112,21 @@ prob.setup( P, q, A, l, u, 'warm_start', true, 'verbose', false );
 % simulate
 
 if (VIS_ON)
-figure(1)
-plot(x0(1), x0(2), 'bx', 'MarkerSize', 30)
-hold on
-plot(ref(1), ref(2), 'bx', 'MarkerSize', 30)
-plot(obj_xy(1), obj_xy(2), 'k+')
-viscircles(obj_xy', min_dist)
+    figure(1)
+    plot(x0(1), x0(2), 'bx', 'MarkerSize', 30, 'DisplayName', 'Start')
+    hold on
+    plot(ref(1), ref(2), 'rx', 'MarkerSize', 30, 'DisplayName', 'End')
+    plot(obj_xy(1), obj_xy(2), 'r+', 'DisplayName', 'Radius of Avoidance')
+    viscircles(obj_xy', min_dist)
 
-xlabel('x (m)')
-ylabel('y (m)')
-title('Drone at time kT, T=0.1s')
+    xlabel('x (m)')
+    ylabel('y (m)')
+    title('Drone at time kT, T=0.1s')
 end
 
 error_count = 0;
 
-simtime = 2;
+simtime = 20;
 
 x_hist = zeros((N+1)*nx, simtime);
 
@@ -163,21 +164,23 @@ for i = 1 : simtime
     
         
         
-    if (VIS_ON)
-        hold on
-        plot(x0(1),x0(2), 'r.', 'MarkerSize', 20)
-        for j = 2:3
-            x1 = Ad * x1 + Bd * ctrls(:, j);
-            x_hist(nx*(j-1)+1:nx*j, i) = x1;
-            zscat = scatter(x1(1),x1(2), 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'b');
-            zscat.MarkerFaceAlpha = .2;
-            zscat.MarkerEdgeAlpha = .2;
-        end
-        axis equal
-    end
+%     if (VIS_ON)
+%         hold on
+%         plot(x0(1),x0(2), 'r.', 'MarkerSize', 20)
+%         for j = 2:3
+%             x1 = Ad * x1 + Bd * ctrls(:, j);
+%             x_hist(nx*(j-1)+1:nx*j, i) = x1;
+%             zscat = scatter(x1(1),x1(2), 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'b');
+%             zscat.MarkerFaceAlpha = .2;
+%             zscat.MarkerEdgeAlpha = .2;
+%         end
+%         axis equal
+%     end
     
 end
 
+plot(x_hist(1,:), x_hist(2,:), '.', 'MarkerSize', 20, 'Color', 1/255*[73, 146, 214], 'DisplayName', 'Path Taken')
+axis equal
 
 
 
@@ -186,10 +189,6 @@ function [ A, l ] = update_dist_constraint(A, l, N, nx, nu, no, min_dist, x)
     start_idx = m - N - 1; % i = start_idx + k
     
     obj_xy = x((N+1)*nx + 1:(N+1)*nx + no);
-    
-%     Aineq = blkdiag(speye( (N+1)*nx + N*nu ), zeros(2));
-    % reset last N+1 constraints
-    A(end-N:end,:) = zeros(N+1, n);
     
     l(end-N:end) = min_dist * ones( N+1, 1 );
    
