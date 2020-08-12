@@ -24,19 +24,19 @@ eps = 10; % model param
 gam = 1; % model param
 ca = 0.3; % accel lim l
 cd = 0.3; % accel lim u
-psc = 1e-5; % relaxation weight
+% psc = 1e-5; % relaxation weight
 
-% psc = 1e-1;
+psc = 1;
 
-T = 1e-2; % {s} sample period
-sim_step = 1e-2; % {s} simulation step size
+T = 1e-3; % {s} sample period
+sim_step = 1e-3; % {s} simulation step size
 sim_time = 30; % {s}
 N = sim_time/T; % sim length
 z0 = 100; % {m} initial distance
 xstart = 900;
 vstart = 9; % {ms-1} initial speed
 w0 = [ xstart; vstart;  z0 ]; % {m} {ms-1} 
-w = w0; % state variable of car and lead
+w = w0; % w(1) = x; w(2) = v; w(3) = z (dist between lead and car)
 mu = 0;
 
 %%% FORMULATE INITIAL OSQP MATRICES %%%
@@ -67,10 +67,10 @@ u = [ uclf; ucbf ];
 A = [ Aclf; Acbf ];
 
 %%% using hard constraint or FCBF delete appropriately %%%
-l = [ l; lcc ];
-u = [ u; ucc ];
-A = [ A; Acc ];
-% 
+% l = [ l; lcc ];
+% u = [ u; ucc ];
+% A = [ A; Acc ];
+
 % l = [ l; lfcbf ];
 % u = [ u; ufcbf ];
 % A = [ A; Afcbf ];
@@ -82,17 +82,17 @@ solver.setup(P, q, A, l, u, 'warm_start', true, 'verbose', false);
 %%% SIMULATION %%%
 %--------------------------------------------------------------------------
 
-pastW = zeros(5, N*floor(T/sim_step));
+pastW = zeros(6, N*floor(T/sim_step));
 p = 0;
 errCount = 0;
 u_in = 0;
-
+del = 0;
 for e = 1:N
     
-    if (w(2) > 1.1*vd)
-        fprintf('Desired velocity exceeded, terminating\n')
-        break
-    end
+%     if (w(2) > 1.1*vd)
+%         fprintf('Desired velocity exceeded, terminating\n')
+%         break
+%     end
     
     res = solver.solve();
     if ~strcmp(res.info.status, 'solved')
@@ -101,9 +101,9 @@ for e = 1:N
 %         break
     else
         x = res.x;
-        u_in = x(1); % control input relative
-        del = x(2);
-    end
+        u_in = x(1); % wheel force
+        del = x(2); % relaxation param
+    end 
     
     %%% forwards euler integration
     
@@ -120,6 +120,7 @@ for e = 1:N
             
         w = w + wdot * sim_step;
         pastW(3, p) = wdot(2);
+        pastW(6, p) = res.info.obj_val;
     end
     
     Fr = getFr(w(2), f0, f1, f2);
@@ -144,10 +145,10 @@ for e = 1:N
     u = [ uclf; ucbf ];
     A = [ Aclf; Acbf ];
 
-    %%% using hard constraint or FCBF delete appropriately %%%
-    l = [ l; lcc ];
-    u = [ u; ucc ];
-    A = [ A; Acc ];
+    %%% using hard constraint and FCBF delete appropriately %%%
+%     l = [ l; lcc ];
+%     u = [ u; ucc ];
+%     A = [ A; Acc ];
 
 %     % l = [ l; lfcbf ];
 %     % u = [ u; ufcbf ];
@@ -165,16 +166,19 @@ v = [pastW(2, :), NaN];
 a = [pastW(3, :), NaN];
 z = [pastW(4, :), NaN];
 del = [pastW(5,:), NaN];
+obj = [pastW(6,:), NaN];
 figure(1)
 
 subplot(2,2,1)
 % plot(t,x, 'DisplayName','x');
-hold on
+
 plot(t,v, 'DisplayName','v');
+hold on
 plot(t,a, 'DisplayName','a');
 plot(t,z, 'DisplayName','z');
 yline(vd,'k-.','DisplayName','v_d');
-axis([0 0.99*p*T 0 max(z)])
+yline(v0, 'k-.','DisplayName','v_0');
+axis([0 0.99*p*T min(a) max(z)])
 xlabel('t (s)')
 title('Velocity, Accel, Separation')
 legend()
@@ -184,6 +188,7 @@ subplot(2,2,2)
 plot(t,z-1.8*v, 'DisplayName','safe heading');
 hold on
 plot(t, vd-v, 'DisplayName', 'Soft Constraint');
+hold off
 axis([0 0.99*p*T min(vd-v) max(z-1.8*v)])
 title('Constraints')
 xlabel('t (s)')
@@ -195,7 +200,11 @@ title('Relaxation Param')
 xlabel('t (s)')
 legend()
 axis([0 0.99*p*T min(del) max(del)])
+sgtitle(sprintf('Relaxation weight %f',psc));
 
+subplot(2,2,4)
+plot(t, obj, 'DisplayName', 'J');
+title('Objective function')
 
 %%% FUNCTIONS %%% TAKE CARE ON SIGNS
 %--------------------------------------------------------------------------
