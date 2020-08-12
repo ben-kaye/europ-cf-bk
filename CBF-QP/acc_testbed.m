@@ -24,9 +24,10 @@ eps = 10; % model param
 gam = 1; % model param
 ca = 0.3; % accel lim l
 cd = 0.3; % accel lim u
-% psc = 1e-5; % relaxation weight
+% psc = exp(-5); % relaxation weight
 
-psc = 1;
+% psc = 1;
+psc = 5e1; % big number needed to keep delta down
 
 T = 1e-3; % {s} sample period
 sim_step = 1e-3; % {s} simulation step size
