@@ -9,6 +9,7 @@
 % *                                                                     *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
+clear
 
 %%% CONSTANTS AND MODEL PARAMETERS %%%
 %--------------------------------------------------------------------------
@@ -24,11 +25,17 @@ gam = 1; % model param
 ca = 0.3; % accel lim l
 cd = 0.3; % accel lim u
 psc = 1e-5; % relaxation weight
-T = 1e-1; % {s} sample period
+
+% psc = 1e-1;
+
+T = 1e-2; % {s} sample period
 sim_step = 1e-2; % {s} simulation step size
-N = 100; % sim length
-z0 = 10; % {m} initial distance
-w0 = [ 0; 10;  z0 ]; % {m} {ms-1} 
+sim_time = 30; % {s}
+N = sim_time/T; % sim length
+z0 = 100; % {m} initial distance
+xstart = 900;
+vstart = 9; % {ms-1} initial speed
+w0 = [ xstart; vstart;  z0 ]; % {m} {ms-1} 
 w = w0; % state variable of car and lead
 mu = 0;
 
@@ -37,29 +44,23 @@ mu = 0;
 Fr = getFr(w(2), f0, f1, f2);
 
 P = 2 * diag( [ 1/m^2, psc ]);
-q = -2 * [ Fr; 0 ]; % needs to be updated on each sim
-
-x0 = [ 0; 0 ];
-
-% leq = x0;
-% ueq = x0;
-% Aeq = eye(2);
-
-lcc = ca * m * g;
+q = -2/m * [ Fr; 0 ]; % needs to be updated on each sim
+% 
+lcc = -ca * m * g;
 ucc = cd * m * g;
 Acc = [ 1 0 ];
 
 lclf = -inf;
-uclf = -getPsi0(m, w(2), vd, eps, Fr);
-Aclf = [ getPsi1(m, w(2), vd), -1 ];
+uclf = getbclf(m, w(2), vd, eps, Fr);
+Aclf = getAclf(m, w(2), vd);
 
 lcbf = -inf;
-ucbf = getCBFfgam(m, w(2), w(3), v0, Fr, gam);
-Acbf = [ getCBFg(m, w(2), w(3)), 0];
+ucbf = getbcbf(m, w(2), w(3), v0, Fr, gam);
+Acbf = getAcbf(m, w(2), w(3));
 
 lfcbf = -inf;
-ufcbf = getFCBFf();
-Afcbf = [ getFCBFg() 0 ];
+ufcbf = getbfcbf();
+Afcbf = getAfcbf();
 
 l = [ lclf; lcbf ];
 u = [ uclf; ucbf ];
@@ -69,11 +70,11 @@ A = [ Aclf; Acbf ];
 l = [ l; lcc ];
 u = [ u; ucc ];
 A = [ A; Acc ];
-
+% 
 % l = [ l; lfcbf ];
 % u = [ u; ufcbf ];
 % A = [ A; Afcbf ];
-%%% %%%
+% %% %%%
 
 solver = osqp;
 solver.setup(P, q, A, l, u, 'warm_start', true, 'verbose', false);
@@ -81,19 +82,27 @@ solver.setup(P, q, A, l, u, 'warm_start', true, 'verbose', false);
 %%% SIMULATION %%%
 %--------------------------------------------------------------------------
 
-pastW = zeros(4, N*floor(T/sim_step));
+pastW = zeros(5, N*floor(T/sim_step));
 p = 0;
 errCount = 0;
 u_in = 0;
 
 for e = 1:N
+    
+    if (w(2) > 1.1*vd)
+        fprintf('Desired velocity exceeded, terminating\n')
+        break
+    end
+    
     res = solver.solve();
     if ~strcmp(res.info.status, 'solved')
 %         fprintf('ERROR\n')
         errCount = errCount + 1;
+%         break
     else
         x = res.x;
         u_in = x(1); % control input relative
+        del = x(2);
     end
     
     %%% forwards euler integration
@@ -102,35 +111,34 @@ for e = 1:N
         p = p + 1;
         pastW([1 2],p) = w(1:2);
         pastW(4,p) = w(3);
-        %%% CHECK IF CAUSES WEIRDNESS
+        pastW(5,p) = del;
+    
         Fr = getFr(w(2), f0, f1, f2);
-%         u = Fr + m*mu;
-%         u = mu;
         
-        wdot =  [ w(2); -Fr; v0 - w(2) ] + ...
+        wdot =  [ w(2); -Fr/m; v0 - w(2) ] + ...
                 [ 0; 1/m; 0 ] * u_in;
             
         w = w + wdot * sim_step;
         pastW(3, p) = wdot(2);
     end
     
-%     % update inequalities %%% NOT OKAY
-%     leq = x;
-%     ueq = x;
-    
     Fr = getFr(w(2), f0, f1, f2);
-
+    
+    %%% UPDATING q
+    q = -2 * Fr / m * [ 1; 0 ];
+    
+    
     lclf = -inf;
-    uclf = -getPsi0(m, w(2), vd, eps, Fr);
-    Aclf = [ getPsi1(m, w(2), vd), -1 ];
-
+    uclf = getbclf(m, w(2), vd, eps, Fr);
+    Aclf = getAclf(m, w(2), vd);
+ 
     lcbf = -inf;
-    ucbf = getCBFfgam(m, w(2), w(3), v0, Fr, gam);
-    Acbf = [ getCBFg(m, w(2), w(3)), 0];
+    ucbf = getbcbf(m, w(2), w(3), v0, Fr, gam);
+    Acbf = getAcbf(m, w(2), w(3));
 
     lfcbf = -inf;
-    ufcbf = getFCBFf();
-    Afcbf = [ getFCBFg() 0 ];
+    ufcbf = getbfcbf();
+    Afcbf = getAfcbf();
     
     l = [ lclf; lcbf ];
     u = [ uclf; ucbf ];
@@ -141,12 +149,12 @@ for e = 1:N
     u = [ u; ucc ];
     A = [ A; Acc ];
 
-    % l = [ l; lfcbf ];
-    % u = [ u; ufcbf ];
-    % A = [ A; Afcbf ];
+%     % l = [ l; lfcbf ];
+%     % u = [ u; ufcbf ];
+%     % A = [ A; Afcbf ];
     %%% %%%
     
-    solver.update('Ax', nonzeros(A), 'l', l, 'u', u);    
+    solver.update('Ax', nonzeros(A), 'l', l, 'u', u, 'q', q);    
 end
 
 %%% PLOT RESULTS %%%
@@ -156,15 +164,37 @@ x = [pastW(1,:), NaN];
 v = [pastW(2, :), NaN];
 a = [pastW(3, :), NaN];
 z = [pastW(4, :), NaN];
-
+del = [pastW(5,:), NaN];
 figure(1)
+
+subplot(2,2,1)
+% plot(t,x, 'DisplayName','x');
 hold on
-plot(t,x, 'DisplayName','x');
 plot(t,v, 'DisplayName','v');
 plot(t,a, 'DisplayName','a');
 plot(t,z, 'DisplayName','z');
+yline(vd,'k-.','DisplayName','v_d');
+axis([0 0.99*p*T 0 max(z)])
+xlabel('t (s)')
+title('Velocity, Accel, Separation')
+legend()
+hold off
 
+subplot(2,2,2)
+plot(t,z-1.8*v, 'DisplayName','safe heading');
+hold on
+plot(t, vd-v, 'DisplayName', 'Soft Constraint');
+axis([0 0.99*p*T min(vd-v) max(z-1.8*v)])
+title('Constraints')
+xlabel('t (s)')
+legend()
 
+subplot(2,2,3)
+plot(t, del, 'DisplayName','\delta')
+title('Relaxation Param')
+xlabel('t (s)')
+legend()
+axis([0 0.99*p*T min(del) max(del)])
 
 
 %%% FUNCTIONS %%% TAKE CARE ON SIGNS
@@ -173,33 +203,43 @@ function Fr = getFr(v, f0, f1, f2)
     Fr = f0 + f1 * v + f2 * v^2;
 end
 
-function psi1 = getPsi1(m, v, vd)
-    psi1 = 2/m * (v - vd);    
+function Aclf = getAclf(m, v, vd)
+    psi1 = 2/m * (v - vd);  
+    
+    Aclf = [ psi1, -1 ];
 end
 
-function psi0 = getPsi0(m, v, vd, eps, Fr)
+function bclf = getbclf(m, v, vd, eps, Fr)
     h = (v - vd); 
     psi0 = -2/m * h * Fr + eps * h^2;
+    
+    bclf = -psi0;
+    
 end
 
-function fcbfG = getFCBFg()
-    fcbfG = 0;
+function Afcbf = getAfcbf() % will complete later
+    Lg = 0;
+    Afcbf = [ Lg, 0 ];
 end
 
-function fcbfF = getFCBFf()
-    fcbfF = 0;
+function bfcbf = getbfcbf() % will complete later
+    Lf = 0;
+    bfcbf = 0;
 end
 
-function cbfFgam = getCBFfgam(m, v, z, v0, Fr, gam)
+function bcbf = getbcbf(m, v, z, v0, Fr, gam)
     h = z - 1.8*v;
     
-    B = - log( h / (1 + h) );
+    B = -log( h / (1 + h) );
     
-    cbfFgam =   + gam / B ...
-                - 1/m*( 1.8*Fr + m*(v0 - v) )/( h * (1 - 1.8*v*z) );
+    Lf = -1/m*( 1.8*Fr + m*(v0 - v) )/( h * (1 + h) );
+    
+    bcbf = -Lf + gam/B;
 end
 
-function cbfG = getCBFg(m, v, z)
+function Acbf = getAcbf(m, v, z)
     h = z - 1.8*v;
-    cbfG = 1.8/m / (1 + h) / h;
+    Lg = 1.8/m * 1/(h*(1 + h));
+    
+    Acbf = [ Lg, 0 ];
 end
