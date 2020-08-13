@@ -189,17 +189,16 @@ function [ A, l ] = update_dist_constraint(A, l, N, nx, nu, no, min_dist, x)
     start_idx = m - N - 1; % i = start_idx + k
     
     obj_xy = x((N+1)*nx + 1:(N+1)*nx + no);
-    
-    l(end-N:end) = min_dist * ones( N+1, 1 );
-   
+
     for k = 1:N+1
         
         state_k = x( (k-1)*nx + 1 : k*nx );
         x_ij = state_k(1:2) - obj_xy;
-        x_norm = norm(x_ij,2);
+        x_norm = norm(x_ij,2);%
+%        x_norm = sum(x_ij.^2);
+        l(end-N-1+k) = x_norm*min_dist;
+        eta = x_ij;
         
-        eta = x_ij / x_norm;    
-            
         T = eta' * [ eye(no), -eye(no) ];
         A( start_idx + k, [ (k-1)*nx + 1 : (k-1)*nx + 2, (N+1)*nx + 1 : (N+1)*nx + no ] ) = T;
     end
