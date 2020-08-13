@@ -28,7 +28,7 @@ cd = 0.3; % accel lim u
 
 psc = exp(-5); % TO BE OVERRIDDEN
 psc_no_acc_lim = 5e1; % big number needed to keep delta down
-psc_acc_lim = 50;
+psc_acc_lim = 500;
 
 T = 1e-3; % {s} sample period
 sim_step = 1e-3; % {s} simulation step size

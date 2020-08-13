@@ -33,11 +33,11 @@ rd = v0/R;
 gam = 1;
 
 step_size = 1e-3; % {s}
-sim_time = 10; % {s}
+sim_time = 20; % {s}
 N = floor(sim_time/step_size);
 
 state = zeros(4,1);
-state = [ 0.5; 0.1; 1e-5; 1e-5 ];
+state = [ 0.5; 1; 1e-5; 1e-5 ];
 u_lat = 0;
 
 %%% LQR SETUP %%%
@@ -55,7 +55,8 @@ B = [ 0; Cf/M; 0; a*Cf/Iz ];
 E =[ 0; 0; -1; 0 ];
 C = [ 1, 0, 20, 0];
 
-Q = Kp*(C'*C) + Kd*C*(At'*At)*C';
+% paper expects Kd*C'At'*At*C but dims do not comply
+Q = Kp*(C'*C) + Kd*(At'*At);
 R = 600;
 
 K = lqr(At, B, Q, R);
@@ -94,8 +95,8 @@ solver.setup(P,q,A,l,u, 'warm_start',true,'verbose',false)
 %%% SIMULATION - FORWARD EULER %%%
 %--------------------------------------------------------------------------
 err_count = 0;
-state_hist = zeros(6,N);
-t_thresh = 5;
+state_hist = zeros(7,N);
+t_thresh = 10;
 switched = false;
 for e = 1:N
     res = solver.solve();
@@ -116,7 +117,7 @@ for e = 1:N
     state_hist(1:4,e) = state;
     state_hist(5, e) = state_dot(2);
     state_hist(6,e) = u_lat;
-    
+    state_hist(7,e) = delta;
     
     if e*step_size > t_thresh && ~switched
         rd = -rd;
@@ -157,7 +158,24 @@ yaw = state_hist(3,:);
 yaw_rate = state_hist(4,:);
 u_in = state_hist(6,:);
 accel = state_hist(5,:);
+dels = state_hist(7,:);
+figure(2);
+subplot(1,3,1)
+title('Lateral Displacement (m)')
+plot(t, y,'DisplayName','y', 'LineWidth',1.5,'Color', 1/255*[0, 157, 252]);
+yline(-y_max, '-.', 'DisplayName', 'y_{min}','LineWidth',1,'Color', [1 0 0])
+yline(y_max, '-.', 'DisplayName', 'y_{max}','LineWidth',1,'Color', [1 0 0])
 
+subplot(1,3,2)
+title('Acceleration (ms^{-1})')
+plot(t,accel,'DisplayName','a', 'LineWidth',1.5,'Color', 1/255*[0, 157, 252])
+yline(-a_max, '-.', 'DisplayName', 'a_{min}','LineWidth',1,'Color', [1 0 0])
+yline(a_max, '-.', 'DisplayName', 'a_{max}','LineWidth',1,'Color', [1 0 0])
+legend();
+
+subplot(1,3,3)
+title('Relaxation parameter')
+plot(t, dels,'LineWidth',1.5,'Color', 1/255*[0, 157, 252])
 %chatters if sample time is too high T>=O(1e-2)
 
 %%% FUNCTIONS %%%
