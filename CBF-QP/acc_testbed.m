@@ -1,6 +1,7 @@
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 % *                                                                     *
 % *                         Ben Kaye, (c) 2020                          *
+% *                              Uses OSQP                              *
 % *                                                                     *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 % *                                                                     *
@@ -18,25 +19,24 @@ m = 1650; % {kg}
 f0 = 0.1; % {N}
 f1 = 5; % {Ns/m}
 f2 = 0.25; % {Ns+2/m}
-vd = 24; % {ms-1} ideal velocity
+vd = 24; % {ms-1} desired velocity
 v0 = 13.89; % {ms-1} lead car velocity
-eps = 10; % model param
-gam = 1; % model param
+eps = 5; % model param // suggested 10
+gam = 1; % model param // suggested 1
 ca = 0.3; % accel lim l
 cd = 0.3; % accel lim u
-% psc = exp(-5); % relaxation weight
 
-psc = 1; % TO BE OVERRIDDEN
+psc = exp(-5); % TO BE OVERRIDDEN
 psc_no_acc_lim = 5e1; % big number needed to keep delta down
-psc_acc_lim = 200;
+psc_acc_lim = 50;
 
 T = 1e-3; % {s} sample period
 sim_step = 1e-3; % {s} simulation step size
-sim_time = 30; % {s}
+sim_time = 20; % {s}
 N = sim_time/T; % sim length
 z0 = 100; % {m} initial distance
 xstart = 900; % {m} initial x-coord a bit unused)
-vstart = 9; % {ms-1} initial speed
+vstart = 20; % {ms-1} initial speed
 w0 = [ xstart; vstart;  z0 ]; % {m} {ms-1} {m}
 w = w0; % state :: w(1) = x; w(2) = v; w(3) = z (dist between lead and car)
 mu = 0;
@@ -113,21 +113,21 @@ for e = 1:N
     
     %%% forwards euler integration
     
-    for k = 1:floor(T/sim_step)
-        p = p + 1;
-        pastW([1 2],p) = w(1:2);
-        pastW(4,p) = w(3);
-        pastW(5,p) = del;
-    
-        Fr = getFr(w(2), f0, f1, f2);
-        
-        wdot =  [ w(2); -Fr/m; v0 - w(2) ] + ...
-                [ 0; 1/m; 0 ] * u_in;
-            
-        w = w + wdot * sim_step;
-        pastW(3, p) = wdot(2);
-        pastW(6, p) = res.info.obj_val;
-    end
+%     for k = 1:floor(T/sim_step)
+    p = p + 1;
+    pastW([1 2],p) = w(1:2);
+    pastW(4,p) = w(3);
+    pastW(5,p) = del;
+
+%     Fr = getFr(w(2), f0, f1, f2);
+
+    wdot =  [ w(2); -Fr/m; v0 - w(2) ] + ...
+            [ 0; 1/m; 0 ] * u_in;
+
+    w = w + wdot * sim_step;
+    pastW(3, p) = wdot(2);
+    pastW(6, p) = res.info.obj_val;
+%     end
     
     Fr = getFr(w(2), f0, f1, f2);
     
@@ -207,15 +207,16 @@ legend()
 mindel = min(del);
 maxdel = max(del);
 axis([0, 0.99*p*T, min(del)-1, max(del)+1])
-sgtitle(sprintf('Relaxation weight %f',psc));
+sgtitle(sprintf('Relaxation weight %f\nEpsilon %f\nGamma %f',psc,eps,gam));
 
 subplot(2,2,4)
 % plot(t, obj, 'DisplayName', 'J');
 % title('Objective function')
 
 plot(t,a, 'DisplayName','a','LineWidth',1.5,'Color', 1/255*[0, 157, 252]);
-yline(-cd*g, 'DisplayName', 'a_{min}')
-yline(ca*g, 'DisplayName', 'a_{max}')
+yline(-cd*g, '-.', 'DisplayName', 'a_{min}','LineWidth',1,'Color', [1 0 0])
+yline(ca*g, '-.', 'DisplayName', 'a_{max}','LineWidth',1,'Color', [1 0 0])
+axis([0, 0.99*p*T, -3.3, 3.3])
 title('Acceleration')
 xlabel('t (s)')
 ylabel('a (ms^{-2})')
