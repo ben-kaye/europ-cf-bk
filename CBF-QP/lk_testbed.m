@@ -1,4 +1,16 @@
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% *                                                                     *
+% *                         Ben Kaye, (c) 2020                          *
+% *                              Uses OSQP                              *
+% *                                                                     *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% *                                                                     *
+% *                 Implementing paper by A. Ames et al                 *
+% *            https://ieeexplore.ieee.org/document/7040372             *
+% *                                                                     *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
+%The LQR formulation is definitely not right. Works but barely.
 
 clear
 
@@ -20,7 +32,7 @@ R = 100; % {m}
 rd = v0/R;
 gam = 1;
 
-step_size = 1e-4; % {s}
+step_size = 1e-3; % {s}
 sim_time = 10; % {s}
 N = floor(sim_time/step_size);
 
@@ -146,8 +158,7 @@ yaw_rate = state_hist(4,:);
 u_in = state_hist(6,:);
 accel = state_hist(5,:);
 
-%major chattering, could be issue with the lqr controller. at least safety
-%works
+%chatters if sample time is too high T>=O(1e-2)
 
 %%% FUNCTIONS %%%
 %--------------------------------------------------------------------------
