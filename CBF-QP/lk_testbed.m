@@ -1,3 +1,5 @@
+
+
 clear
 
 %%% CONSTANTS AND MODEL PARAMETERS %%%
@@ -9,19 +11,21 @@ Cr = 9.88e4; % {N rad-1}
 Iz = 2315.3; % {kg m2}
 a_max = 0.3 * g; % {ms-2}
 psc = 100;
-v0 = 27.7; % {ms-1}
+v0 = 10; % {ms-1}
 c = 10;
 y_max = 0.9; % {m}
 a = 1.11; % {m}
 b = 1.59; % {m}
-rd = 10; % {m}
+R = 100; % {m}
+rd = v0/R;
 gam = 1;
 
-step_size = 1e-2; % {s}
-run_time = 10; % {s}
-N = floor(run_time/step_size);
+step_size = 1e-4; % {s}
+sim_time = 10; % {s}
+N = floor(sim_time/step_size);
 
 state = zeros(4,1);
+state = [ 0.5; 0.1; 1e-5; 1e-5 ];
 u_lat = 0;
 
 %%% LQR SETUP %%%
@@ -51,7 +55,7 @@ P = diag([1, psc]);
 q = [0;0];
 
 Afc = [ 1 0 ];
-[lfc, ufc] = getulfc(state(2),state(4),a,b,M,Cf,Cr,v0,rd,a_max);
+[lfc, ufc] = getulfc(state(2),state(4),a,b,M,Cf,Cr,v0,a_max);
 
 Acbf_lk = getAcbf_lk(state(1),state(2),y_max,a_max,M,Cf);
 ucbf_lk = getucbf_lk(state(1),state(2),state(4),y_max,a_max,M,Cf,Cr,a,b,v0,rd,gam);
@@ -59,12 +63,17 @@ lcbf_lk = -inf;
 
 Ak = [ 1, -1 ];
 %I think should be [0; 0; rd; 0];
-uk = -K*(state - [0; 0; 0; rd]);
+uk = -K*(state - [0; 0; rd; 0]);
 lk = uk;
 
 A = [Afc; Acbf_lk; Ak];
 u = [ufc; ucbf_lk; uk];
 l = [lfc; lcbf_lk; lk];
+
+% A = [ Acbf_lk; Ak ];
+% u = [ ucbf_lk; uk ];
+% l = [ lcbf_lk; lk ];
+
 
 solver = osqp;
 solver.setup(P,q,A,l,u, 'warm_start',true,'verbose',false)
@@ -73,6 +82,9 @@ solver.setup(P,q,A,l,u, 'warm_start',true,'verbose',false)
 %%% SIMULATION - FORWARD EULER %%%
 %--------------------------------------------------------------------------
 err_count = 0;
+state_hist = zeros(6,N);
+t_thresh = 5;
+switched = false;
 for e = 1:N
     res = solver.solve();
     if( res.info.status_val ~= 1 )
@@ -89,8 +101,20 @@ for e = 1:N
     state_dot = At*state + B*u_lat + E*rd;
     state = state + step_size * state_dot;
     
+    state_hist(1:4,e) = state;
+    state_hist(5, e) = state_dot(2);
+    state_hist(6,e) = u_lat;
+    
+    
+    if e*step_size > t_thresh && ~switched
+        rd = -rd;
+        switched = true;
+    end
+    
+    
+    
     %%% UPDATE CONSTRAINTS %%%
-    [lfc, ufc] = getulfc(state(2),state(4),a,b,M,Cf,Cr,v0,rd,a_max);
+    [lfc, ufc] = getulfc(state(2),state(4),a,b,M,Cf,Cr,v0,a_max);
 
     Acbf_lk = getAcbf_lk(state(1),state(2),y_max,a_max,M,Cf);
     ucbf_lk = getucbf_lk(state(1),state(2),state(4),y_max,a_max,M,Cf,Cr,a,b,v0,rd,gam);
@@ -103,19 +127,34 @@ for e = 1:N
     u = [ufc; ucbf_lk; uk];
     l = [lfc; lcbf_lk; lk];
     
+%         A = [ Acbf_lk; Ak ];
+%     u = [ ucbf_lk; uk ];
+%     l = [ lcbf_lk; lk ];
+
+    
     solver.update('Ax',nonzeros(A),'u',u,'l',l);
 end
 
 
 %%% PLOTTING %%%
 %--------------------------------------------------------------------------
+t = 0:step_size:sim_time-step_size;
+y = state_hist(1,:);
+vel = state_hist(2,:);
+yaw = state_hist(3,:);
+yaw_rate = state_hist(4,:);
+u_in = state_hist(6,:);
+accel = state_hist(5,:);
+
+%major chattering, could be issue with the lqr controller. at least safety
+%works
 
 %%% FUNCTIONS %%%
 %--------------------------------------------------------------------------
-function [lfc, ufc] = getulfc(v,r,a,b,M,Cf,Cr,v0,rd,a_max)
-    o = Cf/v0 * (v + a*r) + Cr/v0 * (v -b*r) + M*v0*rd;
-    lfc = -M*a_max + o;
-    ufc = M*a_max + o;
+function [lfc, ufc] = getulfc(v,r,a,b,M,Cf,Cr,v0,a_max)
+    o = 1/Cf * ( v/v0 * (Cf+Cr) + M*r*v0 - r/v0 * ( b*Cr - a*Cf ) );
+    lfc = -M*a_max/Cf + o;
+    ufc = M*a_max/Cf + o;
 end
 
 function Acbf_lk = getAcbf_lk(y, v, y_max, a_max, M, Cf)
