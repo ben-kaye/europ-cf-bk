@@ -217,14 +217,15 @@ title('Lateral Displacement (m)')
 
 subplot(3,1,2)
 
-plot(t,accel,'DisplayName','\ddot{y}', 'LineWidth',1.5,'Color', 1/255*[0, 157, 252])
-yline(-a_max, '-.', 'DisplayName', 'a_{min}','LineWidth',1,'Color', [1 0 0])
-yline(a_max, '-.', 'DisplayName', 'a_{max}','LineWidth',1,'Color', [1 0 0])
+plot(t,accel,'DisplayName','$\ddot{y}$', 'LineWidth',1.5,'Color', 1/255*[0, 157, 252])
+yline(-a_max, '-.', 'DisplayName', '$\ddot{y}_{min}$','LineWidth',1,'Color', [1 0 0])
+yline(a_max, '-.', 'DisplayName', '$\ddot{y}_{max}$','LineWidth',1,'Color', [1 0 0])
 % axis([0 t(end) -a_max-0.5 a_max+0.5]);
 
 title('Acceleration (ms^{-1})')
 
-legend();
+L=legend();
+set(L,'Interpreter','latex')
 
 subplot(3,1,3)
 
