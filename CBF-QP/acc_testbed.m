@@ -22,8 +22,8 @@ f2 = 0.25; % {Ns+2/m}
 vd = 22; % {ms-1} desired velocity
 eps = 5; % model param // suggested 10
 gam = 1; % model param // suggested 1
-ca = 0.25; % accel lim l
-cd = 0.25; % accel lim u
+cd = 0.25; % accel lim l
+ca = 0.25; % accel lim u
 
 psc = exp(-5); % TO BE OVERRIDDEN
 psc_no_acc_lim = 5e1; % big number needed to keep delta down
