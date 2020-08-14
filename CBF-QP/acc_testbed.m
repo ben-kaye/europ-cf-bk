@@ -249,7 +249,7 @@ function [Aclf, uclf] = getCLFconstr(m, v, Fr, vd, eps)
     uclf = -eps*V - LfV;
 end
 
-function [Afcbf, ufcbf] = getFCBFconstr(m, v, vL, z, Fr, cd, g) % will complete later
+function [Afcbf, ufcbf] = getFCBFconstr(m, v, vL, z, Fr, cd, g)
     
     zdot = vL - v;
     
