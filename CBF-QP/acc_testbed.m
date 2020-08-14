@@ -30,9 +30,9 @@ psc_no_acc_lim = 5e1; % big number needed to keep delta down
 psc_acc_lim = 500;
 
 T = 1e-3; % {s} sample period
-sim_step = 1e-3; % {s} simulation step size
-sim_time = 20; % {s}
-N = sim_time/T; % sim length
+sim_step = 5e-2; % {s} simulation step size
+sim_time = 15; % {s}
+N = sim_time/sim_step; % sim length
 z0 = 150; % {m} initial distance
 vstart = 18; % {m} initial velocity)
 % vlstart = 10; % {ms-1} initial speed
@@ -43,7 +43,7 @@ mu = 0;
 a_L = 0; % {ms-2} lead car accel
 
 
-FCBF_ON = 0; %{1:ON 0:OFF} Whether to include hard constraint on accel, and appropriate CBF
+FCBF_ON = 1; %{1:ON 0:OFF} Whether to include hard constraint on accel, and appropriate CBF
 
 if FCBF_ON
     psc = psc_acc_lim;
@@ -103,7 +103,7 @@ errCount = 0;
 u_in = 0;
 del = 0;
 
-a_L = 3;
+% a_L = 3;
 
 for e = 1:N
 
@@ -173,7 +173,7 @@ end
 
 %%% PLOT RESULTS %%%
 %--------------------------------------------------------------------------
-t = 0:sim_step:N*T;
+t = 0:sim_step:p*sim_step;
 t = t(1:p);
 v = pastW(1,1:p);
 a = pastW(2,1:p);
@@ -257,9 +257,17 @@ function [Afcbf, ufcbf] = getFCBFconstr(m, v, vL, z, Fr, cd, g)
     
     hF = h - 1/2/cd/g*zdot^2;
     
+    % previously had as -1 times this
     LgBF = (zdot - 1.8*cd*g)/cd/g/m/hF^2;
     
+    % note previously was -1 which I think was in error
     LfBF = -( m*cd*g*zdot + Fr*(zdot - 1.8*cd*g) )/cd/g/m/hF^2;
+    
+    
+    % as experiment: it works but shouldn't?
+    LgBF = LgBF*-1;
+    LfBF = LfBF*-1;
+    % end experiment
     
     Afcbf = [ LgBF, 0 ];
     
@@ -279,3 +287,4 @@ function [Acbf, ucbf] = getCBFconstr(m, v, vL, z, Fr, gam)
     
     Acbf = [ LgB, 0 ];
 end
+
