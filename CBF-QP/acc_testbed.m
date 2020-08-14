@@ -67,7 +67,7 @@ lcbf = -inf;
 [Acbf, ucbf] = getCBFconstr(m, w(2), w(3), v0, Fr, gam);
 
 lfcbf = -inf;
-[Afcbf, ufcbf] = getFCBFconstr(m,w(2),w(3),v0,cd,g,Fr);
+[Afcbf, ufcbf] = getFCBFconstr(m, w(2), w(3), v0, cd, g, Fr);
 
 if FCBF_ON
     l = [ lclf; lcbf; lcc; lfcbf ];
@@ -231,25 +231,31 @@ function [Aclf, uclf] = getCLFconstr(m, v, vd, eps, Fr)
     uclf = -LfV - eps*V;
 end
 
-function [Afcbf, ufcbf] = getFCBFconstr(m,v, z, v0, cd, g, Fr) % will complete later
-    hF = -1.8*v - 1/2*( v0 - v )^2 /cd/g + z;
+function [Afcbf, ufcbf] = getFCBFconstr(m, v, z, v0, cd, g, Fr) % will complete later
     
-    LgB = -1/m/hF^2 * (  (v0 - v)/cd/g - 1.8 );
+    zdot = v0 - v;
     
-    LfB = 1/hF^2 * ( Fr/m * ( ( v0 - v )/cd/g - 1.8 ) - (v0 -v) );
+    h = z - 1.8*v;
     
-    Afcbf = [ LgB, 0 ];
-    ufcbf = hF - LfB;
+    hF = h - 1/2/cd/g*zdot^2;
+    
+    LgBF = (zdot - 1.8*cd*g)/cd/g/m/hF^2;
+    
+    LfBF = -( m*cd*g*zdot + Fr*(zdot - 1.8*cd*g) )/cd/g/m/hF^2;
+    
+    Afcbf = [ LgBF, 0 ];
+    
+    ufcbf = hF - LfBF;
 end
 
 
-function [Acbf, ucbf] = getCBFconstr(m, v, z,v0, Fr, gam)
+function [Acbf, ucbf] = getCBFconstr(m, v, z, v0, Fr, gam)
     h = z - 1.8*v;
     
-    LgB = 1.8/m * 1/(h*(1 + h));   
-    LfB = -1/m*( 1.8*Fr + m*(v0 - v) )/( h * (1 + h) );
+    LgB = 1.8/m/h/(1 + h);   
+    LfB = -1/m/h/(1 + h)*( 1.8*Fr + m*(v0 - v) );
     
-    B = -log( h / (1 + h) );
+    B = -log( h/(1 + h) );
     
     ucbf = -LfB + gam/B;
     
