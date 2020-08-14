@@ -33,7 +33,7 @@ gam = 1;
 psc = 10; % // 100 recommended
 alph = 3;
 
-step_size = 1e-4; % {s}
+step_size = 5e-4; % {s}
 sim_time = 25; % {s}
 N = floor(sim_time/step_size);
 
@@ -41,7 +41,7 @@ state = zeros(4,1);
 state = [ 0.1; 0.2; 0.1; 0.1 ];
 u_lat = 0;
 
-CONTROLLER_TYPE = 1; % {1: LYAPUNOV, 0: LQR}
+CONTROLLER_TYPE = 0; % {1: LYAPUNOV, 0: LQR}
 
 %%% LQR SETUP %%%
 %--------------------------------------------------------------------------
@@ -69,8 +69,10 @@ E = [ 0; 0; -1; 0 ];
 C = [ 1, 0, 20, 0];
 
 % paper expects Kd*C'At'*At*C but dims do not comply
-Q = Kp*(C'*C) + Kd*(At'*At);
+Q = Kp*(C'*C) + Kd*(At'*(C'*C)*At);
 R = 600;
+
+
 
 K = lqr(At, B, Q, R);
 
