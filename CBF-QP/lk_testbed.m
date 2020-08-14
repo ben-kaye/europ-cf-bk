@@ -21,24 +21,27 @@ M = 1650; % {kg}
 Cf = 1.33e5; % {N rad-1}
 Cr = 9.88e4; % {N rad-1}
 Iz = 2315.3; % {kg m2}
-a_max = 0.3 * g; % {ms-2}
-psc = 10; % // 100 recommended
-v0 = 10; % {ms-1}
-c = 10;
 y_max = 0.9; % {m}
 a = 1.11; % {m}
 b = 1.59; % {m}
 R = 100; % {m}
-rd = v0/R;
+a_max = 0.3 * g; % {ms-2}
+v0 = 10; % {ms-1}
+rd = v0/R; % {rad s-1}
+c = 10;
 gam = 1;
+psc = 10; % // 100 recommended
+alph = 3;
 
-step_size = 5e-4; % {s}
+step_size = 1e-4; % {s}
 sim_time = 25; % {s}
 N = floor(sim_time/step_size);
 
 state = zeros(4,1);
 state = [ 0.1; 0.2; 0.1; 0.1 ];
 u_lat = 0;
+
+CONTROLLER_TYPE = 1; % {1: LYAPUNOV, 0: LQR}
 
 %%% LQR SETUP %%%
 %--------------------------------------------------------------------------
@@ -88,23 +91,21 @@ Ak = [ 1, -1 ];
 uk = -K*(state - [0;0;0;1]*rd);
 lk = uk;
 
-% Adel = [ 0, 1 ];
-% udel = inf;
-% ldel = 0;
-% 
-% DELTA SHOULD NOT BE CONSTRAINED IN 1 DIRECTION
-% AS ENFORCED BY EQUALITY NOT INEQ
+% y,v,yaw,r,rd,m,a,b,v0,C_r,C_f
+[Aclf, uclf] = getCLFconstr(state(1),state(2),state(3),state(4),rd,M,a,b,v0,Cr,Cf, alph);
+lclf = -inf;
 
-% A = [Afc; Acbf_lk; Ak; Adel];
-% u = [ufc; ucbf_lk; uk; udel];
-% l = [lfc; lcbf_lk; lk; ldel];
-A = [Afc; Acbf_lk; Ak];
-u = [ufc; ucbf_lk; uk];
-l = [lfc; lcbf_lk; lk];
-
-% A = [ Acbf_lk; Ak ];
-% u = [ ucbf_lk; uk ];
-% l = [ lcbf_lk; lk ];
+if CONTROLLER_TYPE
+    %%% CLF %%%
+    A = [Afc; Acbf_lk; Aclf];
+    u = [ufc; ucbf_lk; uclf];
+    l = [lfc; lcbf_lk; uclf];
+else
+    %%% LQR %%%
+    A = [Afc; Acbf_lk; Ak];
+    u = [ufc; ucbf_lk; uk];
+    l = [lfc; lcbf_lk; lk];
+end
 
 
 solver = osqp;
@@ -174,15 +175,23 @@ for e = 1:N
     
     uk = -K*(state - [0; 0; 0; rd]);
     lk = uk;
-% 
-% 
-%     A = [Afc; Acbf_lk; Ak; Adel];
-%     u = [ufc; ucbf_lk; uk; udel];
-%     l = [lfc; lcbf_lk; lk; ldel];
-    A = [Afc; Acbf_lk; Ak];
-    u = [ufc; ucbf_lk; uk];
-    l = [lfc; lcbf_lk; lk];
 
+    [Aclf, uclf] = getCLFconstr(state(1),state(2),state(3),state(4),rd,M,a,b,v0,Cr,Cf,alph);
+    lclf = -inf;
+
+    
+    
+    if CONTROLLER_TYPE
+        %%% CLF %%%
+        A = [Afc; Acbf_lk; Aclf];
+        u = [ufc; ucbf_lk; uclf];
+        l = [lfc; lcbf_lk; uclf];
+    else
+        %%% LQR %%%
+        A = [Afc; Acbf_lk; Ak];
+        u = [ufc; ucbf_lk; uk];
+        l = [lfc; lcbf_lk; lk];
+    end
 
 
     
@@ -193,7 +202,7 @@ end
 %%% PLOTTING %%%
 %--------------------------------------------------------------------------
 t = 0:step_size:sim_time-step_size;
-
+e=e-1;
 t = t(1:e);
 
 y = state_hist(1,1:e);
@@ -278,4 +287,16 @@ function [ Acbf_lk, ucbf_lk, h_F ] = getCBFconstr(y,v,yaw,r,y_max,a_max,M,C_f,C_
     
     Acbf_lk = [ LgBF, 0 ];
     ucbf_lk = -LfBF + gam/BF;
+end
+
+function [Aclf, uclf] = getCLFconstr(y,v,yaw,r,rd,m,a,b,v0,C_r,C_f, alpha)
+    ydot = v + yaw*v0;
+    V = y^2 + ydot^2;
+    
+    LgV = 2*ydot*C_f/m;
+    LfV = 2*ydot*(y + C_r/m/v0*(b*r - v) - C_f/m/v0*(a*r + v) -rd*v0);
+    
+    Aclf = [LgV, -1];
+    uclf = -alpha * V - LfV;
+    
 end
