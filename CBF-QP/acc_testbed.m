@@ -5,8 +5,8 @@
 % *                                                                     *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 % *                                                                     *
-% *        Implementing Automatic Cruise-Control with CBF-CLF-QP        *
-% *                       using paper by A. Ames                        *
+% *                 Implementing paper by A. Ames et al                 *
+% *            https://ieeexplore.ieee.org/document/7040372             *
 % *                                                                     *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
@@ -61,16 +61,13 @@ ucc = cd * m * g;
 Acc = [ 1 0 ];
 
 lclf = -inf;
-uclf = getbclf(m, w(2), vd, eps, Fr);
-Aclf = getAclf(m, w(2), vd);
+[Aclf, uclf] = getCLFconstr(m, w(2), vd, eps, Fr);
 
 lcbf = -inf;
-ucbf = getbcbf(m, w(2), w(3), v0, Fr, gam);
-Acbf = getAcbf(m, w(2), w(3));
+[Acbf, ucbf] = getCBFconstr(m, w(2), w(3), v0, Fr, gam);
 
 lfcbf = -inf;
-ufcbf = getbfcbf(m,w(2),w(3),v0,cd,g,Fr);
-Afcbf = getAfcbf(m,w(2),w(3),v0,cd,g);
+[Afcbf, ufcbf] = getFCBFconstr(m,w(2),w(3),v0,cd,g,Fr);
 
 if FCBF_ON
     l = [ lclf; lcbf; lcc; lfcbf ];
@@ -129,24 +126,17 @@ for e = 1:N
     pastW(6, p) = res.info.obj_val;
 %     end
     
+
+    %%% UPDATE CONSTRAINTS %%%
+    
     Fr = getFr(w(2), f0, f1, f2);
     
-    %%% UPDATING q
+    % update q
     q = -2 * Fr / m * [ 1; 0 ];
     
-    
-    lclf = -inf;
-    uclf = getbclf(m, w(2), vd, eps, Fr);
-    Aclf = getAclf(m, w(2), vd);
- 
-    lcbf = -inf;
-    ucbf = getbcbf(m, w(2), w(3), v0, Fr, gam);
-    Acbf = getAcbf(m, w(2), w(3));
-
-    lfcbf = -inf;
-    ufcbf = getbfcbf(m,w(2),w(3),v0,cd,g,Fr);
-    Afcbf = getAfcbf(m,w(2),w(3),v0,cd,g);
-
+    [Aclf, uclf] = getCLFconstr(m, w(2), vd, eps, Fr);
+    [Acbf, ucbf] = getCBFconstr(m, w(2), w(3), v0, Fr, gam);
+    [Afcbf, ufcbf] = getFCBFconstr(m,w(2),w(3),v0,cd,g,Fr);
     
     if FCBF_ON
         l = [ lclf; lcbf; lcc; lfcbf ];
@@ -229,47 +219,39 @@ function Fr = getFr(v, f0, f1, f2)
     Fr = f0 + f1 * v + f2 * v^2;
 end
 
-function Aclf = getAclf(m, v, vd)
-    psi1 = 2/m * (v - vd);  
+function [Aclf, uclf] = getCLFconstr(m, v, vd, eps, Fr)
+    y = (v - vd);
+
+    LfV = -2*y*Fr/m;
+    LgV = 2*y/m;
     
-    Aclf = [ psi1, -1 ];
+    V = y^2;
+    
+    Aclf = [ LgV, -1 ];
+    uclf = -LfV - eps*V;
 end
 
-function bclf = getbclf(m, v, vd, eps, Fr)
-    h = (v - vd); 
-    psi0 = -2/m * h * Fr + eps * h^2;
-    
-    bclf = -psi0;
-    
-end
-
-function Afcbf = getAfcbf(m,v, z, v0, cd, g) % will complete later
+function [Afcbf, ufcbf] = getFCBFconstr(m,v, z, v0, cd, g, Fr) % will complete later
     hF = -1.8*v - 1/2*( v0 - v )^2 /cd/g + z;
     
-    Lg = -1/m/hF^2 * (  (v0 - v)/cd/g - 1.8 );
+    LgB = -1/m/hF^2 * (  (v0 - v)/cd/g - 1.8 );
     
-    Afcbf = [ Lg, 0 ];
+    LfB = 1/hF^2 * ( Fr/m * ( ( v0 - v )/cd/g - 1.8 ) - (v0 -v) );
+    
+    Afcbf = [ LgB, 0 ];
+    ufcbf = hF - LfB;
 end
 
-function bfcbf = getbfcbf(m, v, z, v0, cd, g, Fr) % will complete later
-    hF = -1.8*v - 1/2*( v0 - v )^2 /cd/g + z;
-    Lf = 1/hF^2 * ( Fr/m * ( ( v0 - v )/cd/g - 1.8 ) - (v0 -v) );
-    bfcbf = hF - Lf;
-end
 
-function bcbf = getbcbf(m, v, z, v0, Fr, gam)
+function [Acbf, ucbf] = getCBFconstr(m, v, z,v0, Fr, gam)
     h = z - 1.8*v;
+    
+    LgB = 1.8/m * 1/(h*(1 + h));   
+    LfB = -1/m*( 1.8*Fr + m*(v0 - v) )/( h * (1 + h) );
     
     B = -log( h / (1 + h) );
     
-    Lf = -1/m*( 1.8*Fr + m*(v0 - v) )/( h * (1 + h) );
+    ucbf = -LfB + gam/B;
     
-    bcbf = -Lf + gam/B;
-end
-
-function Acbf = getAcbf(m, v, z)
-    h = z - 1.8*v;
-    Lg = 1.8/m * 1/(h*(1 + h));
-    
-    Acbf = [ Lg, 0 ];
+    Acbf = [ LgB, 0 ];
 end
