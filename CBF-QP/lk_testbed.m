@@ -6,7 +6,7 @@
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 % *                                                                     *
 % *                 Implementing paper by A. Ames et al                 *
-% *            https://ieeexplore.ieee.org/document/7040372             *
+% *            https://ieeexplore.ieee.org/document/7782377             *
 % *                                                                     *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
@@ -22,7 +22,7 @@ Cf = 1.33e5; % {N rad-1}
 Cr = 9.88e4; % {N rad-1}
 Iz = 2315.3; % {kg m2}
 a_max = 0.3 * g; % {ms-2}
-psc = 100;
+psc = 10; % // 100 recommended
 v0 = 10; % {ms-1}
 c = 10;
 y_max = 0.9; % {m}
@@ -32,16 +32,21 @@ R = 100; % {m}
 rd = v0/R;
 gam = 1;
 
-step_size = 1e-3; % {s}
-sim_time = 20; % {s}
+step_size = 5e-4; % {s}
+sim_time = 25; % {s}
 N = floor(sim_time/step_size);
 
 state = zeros(4,1);
-state = [ 0.5; 1; 1e-5; 1e-5 ];
+state = [ 0.1; 0.2; 0.1; 0.1 ];
 u_lat = 0;
 
 %%% LQR SETUP %%%
 %--------------------------------------------------------------------------
+
+% QP program min xT P x + qT x st Ax <= b
+% x in Re2
+% x(1) = u
+% x(2) = delta
 
 Kp = 5;
 Kd = 0.4;
@@ -51,8 +56,13 @@ At = [ zeros(4,1), [ [ 1, v0, 0 ];...
         [ -1/M/v0 * (Cf + Cr), 0, 1/M/v0 * (b*Cr - a*Cf) - v0 ]; ...
         [ 0, 0, 1];...
         [ 1/Iz/v0 * ( b*Cr - a*Cf ), 0, -1/Iz/v0 * (a^2*Cf + b^2*Cr)] ] ];
+    
 B = [ 0; Cf/M; 0; a*Cf/Iz ];
-E =[ 0; 0; -1; 0 ];
+
+% E =[ 0; 0; -1; 0 ];
+E = [ 0; 0; -1; 0 ];
+
+
 C = [ 1, 0, 20, 0];
 
 % paper expects Kd*C'At'*At*C but dims do not comply
@@ -68,17 +78,26 @@ P = diag([1, psc]);
 q = [0;0];
 
 Afc = [ 1 0 ];
-[lfc, ufc] = getulfc(state(2),state(4),a,b,M,Cf,Cr,v0,a_max);
+[lfc, ufc] = getulfc(state(2),state(4),a,b,M,Cf,Cr,v0,rd,a_max);
 
-Acbf_lk = getAcbf_lk(state(1),state(2),y_max,a_max,M,Cf);
-ucbf_lk = getucbf_lk(state(1),state(2),state(4),y_max,a_max,M,Cf,Cr,a,b,v0,rd,gam);
+[ Acbf_lk, ucbf_lk, hF ] = getCBFconstr(state(1),state(2),state(3),state(4),y_max,a_max,M,Cf,Cr,a,b,v0,rd,gam);
+
 lcbf_lk = -inf;
 
 Ak = [ 1, -1 ];
-%I think should be [0; 0; rd; 0];
-uk = -K*(state - [0; 0; rd; 0]);
+uk = -K*(state - [0;0;0;1]*rd);
 lk = uk;
 
+% Adel = [ 0, 1 ];
+% udel = inf;
+% ldel = 0;
+% 
+% DELTA SHOULD NOT BE CONSTRAINED IN 1 DIRECTION
+% AS ENFORCED BY EQUALITY NOT INEQ
+
+% A = [Afc; Acbf_lk; Ak; Adel];
+% u = [ufc; ucbf_lk; uk; udel];
+% l = [lfc; lcbf_lk; lk; ldel];
 A = [Afc; Acbf_lk; Ak];
 u = [ufc; ucbf_lk; uk];
 l = [lfc; lcbf_lk; lk];
@@ -95,14 +114,24 @@ solver.setup(P,q,A,l,u, 'warm_start',true,'verbose',false)
 %%% SIMULATION - FORWARD EULER %%%
 %--------------------------------------------------------------------------
 err_count = 0;
-state_hist = zeros(7,N);
-t_thresh = 10;
-switched = false;
+state_hist = zeros(9,N);
+t_thresh1 = 10;
+switched1 = false;
+t_thresh2 = 15;
+switched2 = false;
+
+if (hF < 0)
+    error('Outside of safety bound at sim start')
+end
+
 for e = 1:N
+    
+    
     res = solver.solve();
     if( res.info.status_val ~= 1 )
         %%% SOLVER FAILED %%%
         err_count = err_count + 1;
+        break
     else
         %%% SOLVED %%%
         w = res.x;
@@ -118,31 +147,43 @@ for e = 1:N
     state_hist(5, e) = state_dot(2);
     state_hist(6,e) = u_lat;
     state_hist(7,e) = delta;
+    state_hist(8,e) = hF;
+    state_hist(9,e) = rd;
     
-    if e*step_size > t_thresh && ~switched
+    if e*step_size > t_thresh1 && ~switched1
         rd = -rd;
-        switched = true;
+        switched1 = true;
+    end
+    
+    if e*step_size > t_thresh2 && ~switched2
+        R = 50;
+        rd = +v0/R;
+        switched2 = true;
     end
     
     
     
     %%% UPDATE CONSTRAINTS %%%
-    [lfc, ufc] = getulfc(state(2),state(4),a,b,M,Cf,Cr,v0,a_max);
-
-    Acbf_lk = getAcbf_lk(state(1),state(2),y_max,a_max,M,Cf);
-    ucbf_lk = getucbf_lk(state(1),state(2),state(4),y_max,a_max,M,Cf,Cr,a,b,v0,rd,gam);
-
-    uk = -K*(state - [0; 0; 0; rd]);
-    lk = uk;
+    % (v,r,a,b,M,Cf,Cr,v0,rd,a_max)
+    [lfc, ufc] = getulfc(state(2),state(4),a,b,M,Cf,Cr,v0,rd,a_max);
 
     
+    % (y,v,yaw,r,y_max,a_max,M,C_f,C_r,a,b,v_0,r_d,gam)
+    [ Acbf_lk, ucbf_lk, hF ] = getCBFconstr(state(1),state(2),state(3),state(4),y_max,a_max,M,Cf,Cr,a,b,v0,rd,gam);
+
+    
+    uk = -K*(state - [0; 0; 0; rd]);
+    lk = uk;
+% 
+% 
+%     A = [Afc; Acbf_lk; Ak; Adel];
+%     u = [ufc; ucbf_lk; uk; udel];
+%     l = [lfc; lcbf_lk; lk; ldel];
     A = [Afc; Acbf_lk; Ak];
     u = [ufc; ucbf_lk; uk];
     l = [lfc; lcbf_lk; lk];
-    
-%         A = [ Acbf_lk; Ak ];
-%     u = [ ucbf_lk; uk ];
-%     l = [ lcbf_lk; lk ];
+
+
 
     
     solver.update('Ax',nonzeros(A),'u',u,'l',l);
@@ -152,54 +193,88 @@ end
 %%% PLOTTING %%%
 %--------------------------------------------------------------------------
 t = 0:step_size:sim_time-step_size;
-y = state_hist(1,:);
-vel = state_hist(2,:);
-yaw = state_hist(3,:);
-yaw_rate = state_hist(4,:);
-u_in = state_hist(6,:);
-accel = state_hist(5,:);
-dels = state_hist(7,:);
+
+t = t(1:e);
+
+y = state_hist(1,1:e);
+vel = state_hist(2,1:e);
+yaw = state_hist(3,1:e);
+yaw_rate = state_hist(4,1:e);
+u_in = state_hist(6,1:e);
+accel = state_hist(5,1:e);
+dels = state_hist(7,1:e);
+hFt = state_hist(8,1:e);
+r_dt = state_hist(9,1:e);
+
 figure(2);
-subplot(1,3,1)
-title('Lateral Displacement (m)')
+
+subplot(3,1,1)
+
 plot(t, y,'DisplayName','y', 'LineWidth',1.5,'Color', 1/255*[0, 157, 252]);
 yline(-y_max, '-.', 'DisplayName', 'y_{min}','LineWidth',1,'Color', [1 0 0])
 yline(y_max, '-.', 'DisplayName', 'y_{max}','LineWidth',1,'Color', [1 0 0])
+title('Lateral Displacement (m)')
 
-subplot(1,3,2)
-title('Acceleration (ms^{-1})')
-plot(t,accel,'DisplayName','a', 'LineWidth',1.5,'Color', 1/255*[0, 157, 252])
+subplot(3,1,2)
+
+plot(t,accel,'DisplayName','\ddot{y}', 'LineWidth',1.5,'Color', 1/255*[0, 157, 252])
 yline(-a_max, '-.', 'DisplayName', 'a_{min}','LineWidth',1,'Color', [1 0 0])
 yline(a_max, '-.', 'DisplayName', 'a_{max}','LineWidth',1,'Color', [1 0 0])
+% axis([0 t(end) -a_max-0.5 a_max+0.5]);
+
+title('Acceleration (ms^{-1})')
+
 legend();
 
-subplot(1,3,3)
+subplot(3,1,3)
+
+plot(t, dels,'DisplayName','\delta','LineWidth', 1.5, 'Color', 1/255*[0, 157, 252])
+hold on 
+plot(t, hFt, 'DisplayName', 'h_F', 'LineWidth', 1.5, 'Color', [1 0 0])
+hold off
+legend();
 title('Relaxation parameter')
-plot(t, dels,'LineWidth',1.5,'Color', 1/255*[0, 157, 252])
 %chatters if sample time is too high T>=O(1e-2)
+
+figure(1)
+subplot(3,1,1)
+maxu = max(abs(u_in));
+plot(t,u_in,'DisplayName','u', 'LineWidth',1.5,'Color', 1/255*[0, 157, 252])
+axis([ 0, t(e), -maxu, maxu]);
+title('Wheel input');
+subplot(3,1,2)
+a_real = v0*(yaw_rate+r_dt);
+maxa = max(abs(a_real));
+plot(t, a_real, 'DisplayName','a', 'LineWidth',1.5,'Color', 1/255*[0, 157, 252])
+axis([ 0, t(e), -maxa, maxa]);
+title('Centripetal Acceleration');
+subplot(3,1,3)
+plot(t, r_dt, 'DisplayName','r_d', 'LineWidth',1.5,'Color', 1/255*[0, 157, 252])
+title('Road Curvature Rate');
+
 
 %%% FUNCTIONS %%%
 %--------------------------------------------------------------------------
-function [lfc, ufc] = getulfc(v,r,a,b,M,Cf,Cr,v0,a_max)
-    o = 1/Cf * ( v/v0 * (Cf+Cr) + M*r*v0 - r/v0 * ( b*Cr - a*Cf ) );
+function [lfc, ufc] = getulfc(v,r,a,b,M,Cf,Cr,v0,rd,a_max)
+    o = 1/Cf*( Cf/v0*( v + a*r ) + Cr/v0*( v - b*r ) + M*v0*rd );
     lfc = -M*a_max/Cf + o;
     ufc = M*a_max/Cf + o;
 end
 
-function Acbf_lk = getAcbf_lk(y, v, y_max, a_max, M, Cf)
-    ydot = v; % AGAIN CHECK THIS
-    hF = y_max - y * sign(ydot) - 1/2/a_max*ydot^2;
-    LgBf = Cf/( a_max*M*hF * (1+hF) );
-    Acbf_lk = [ LgBf, 0 ];
-end
+function [ Acbf_lk, ucbf_lk, h_F ] = getCBFconstr(y,v,yaw,r,y_max,a_max,M,C_f,C_r,a,b,v_0,r_d,gam)
+%One shot implementation of the CBF constraint
 
-function ucbf_lk = getucbf_lk(y,v,r,y_max,a_max,M,Cf,Cr,a,b,v0,rd,gam)
-    ydot = v; % TEMPORARY MAY BE WRONG?? as ydot = v + v0*yaw BUT v is lat vel and y is lat displ
-    Q = ydot * sign(ydot) - 1/M/a_max/v0 * ( Cf*(v + a*r) + Cr*(v + b*r) ) -v0*rd/a_max;
+    y_dot = v + v_0 * yaw;
     
-    hF = y_max - y * sign(ydot) - 1/2/a_max*ydot^2;
+    h_F = y_max - y * sign(y_dot) - y_dot^2/2/a_max;
     
-    Bf = -log(hF/(1+hF));
-    LfBf = Q/hF/(hF+1);
-    ucbf_lk = gam/Bf - LfBf;    
+    Q = 2*a_max*sign(y_dot) + C_r/M/v_0 * (b*r - v) - C_f/M/v_0 * (a*r + v) - v_0*r_d;
+    
+    LfBF = y_dot / 2 / a_max / M / h_F / (1+h_F) * Q;
+    LgBF = y_dot * C_f / 2 / a_max / M / h_F / (1+h_F);
+    
+    BF = -log( h_F/(1+h_F) );
+    
+    Acbf_lk = [ LgBF, 0 ];
+    ucbf_lk = -LfBF + gam/BF;
 end
