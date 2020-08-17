@@ -53,7 +53,7 @@ q = [ -2*Q'*x_r; 0; 0 ];
 
 x = [ p0; 1e-5; 1e-5; 1e-5; 1e-5 ];
 
-Aeq = [ eye(6), Bd ];
+Aeq = [ eye(6), -Bd ];
 leq = Ad*x;
 ueq = leq;
 
