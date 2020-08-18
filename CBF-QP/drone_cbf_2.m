@@ -68,18 +68,23 @@ end
 
 function [ LfBF, LgBF, h ] = getCBF(p_xy, phi, p_o, v, max_u, delta, gamma)
     p_dot = v * [ -sin(phi); cos(phi) ];
-    
-    % cross(p_dot, k)
-    r = -[ 0, 1; -1, 0 ] * p_dot / max_u;
 
-    p_c = p_xy - r;
+    p_xo = p_o - p_xy;
+
+    innerprod = p_dot' * [ 0, 1; -1, 0 ] * p_xo; %if innerprod > 0;
+
+
+    % cross(p_dot, k)
+    r = sign(innerprod)*[ 0, 1; -1, 0 ] * p_dot / max_u;
+
+    p_c = p_xy + r;
     
     z = p_o - p_c;
     
     h = z'*z - delta^2;
 
     LfBF = 2*z'*p_dot/h/(1+h);
-    LgBF = -LfBF;
+    LgBF = sign(innerprod)*LfBF/max_u;
     
     BF = -log(h/(1+h));
     
