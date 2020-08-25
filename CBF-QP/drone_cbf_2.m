@@ -1,22 +1,33 @@
-clear 
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+% *                                                                     *
+% *                         Ben Kaye, (c) 2020                          *
+% *                              Uses OSQP                              *
+% *                                                                     *
+% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
+clear
 
-sim_time = 20; % {s}
+%%% SIMULATION PARAMETERS %%%
+
+sim_time = 10; % {s}
 step_size = 1e-3; % {s}
-delta = 0.2; % {m} avoidance distance
-gamma = 1;
-v = 0.5; % {ms-1}
-max_u = 1.5;
-max_v = 4;
-relax_weight = 100;
-
-p_o = [ 5; 3 ];
-
-phi_0 = -1; % {rad}
-p_0 = [ 3; 2 ]; % {m; m}
-
-
+p_o = [ 5; 3 ]; % {m; m} object position
+p_0 = [ 3; 2 ]; % {m; m} initial drone position
+phi_0 = -1; % {rad} initial drone bearing
 x = [p_0; phi_0]; % {m; m; rad} state
+
+%%% CBF-CLF-QP PARAMETERS %%%
+
+delta = 0.2; % {m} avoidance distance
+v = 0.5; % {ms-1}
+max_u = 1.5; % {rads-1}
+max_v = 12; % {ms-1}
+min_v = 0.1; % {ms-1}
+relax_weight = 100; % relax penalty
+R = diag([ 1, 1 ]); % control penalty
+gamma = 1;
+
+%%% REFERENCE SIGNAL GENERATION %%%
 
 p_r = [ 2; 3 ];
 x_r = p_r;
@@ -25,25 +36,25 @@ phi_rdot = 1/2;
 v_r = 1;
 v_rdot = 0;
 
-% u = ones(2,1); % {ms-1; rads-1} control vec
-[ u1, u2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
-u = [ u1; u2 ];
-
+% compute CLF input to track ref
+[ ctrl1, ctrl2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
+ctrl = [ ctrl1; ctrl2 ];
+ctrl = constrain_u(ctrl, min_v, max_v, max_u); % {ms-1; rads-1} control vector
 
 %%% QP SETUP %%%
 solver = osqp;
 
-P = diag([0, 0, relax_weight]);
-q = zeros(3,1);
-
-[ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,u(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+[ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
 [ Aclf, uclf ] = getCLFconstraints(x([1,2]),x_r,x(3),phi_r,phi_rdot,v_r,v_rdot); %(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
 lclf = -inf;
 lcbf = -inf;
 
+P = blkdiag(R,relax_weight);
+q = [ -2*R'*ctrl; 0 ];
+
 Av = [ 1, 0, 0 ];
 uv = max_v;
-lv = 0;
+lv = min_v; % might rather, do 0
 
 Au = [ 0, 1, 0 ];
 uu = max_u;
@@ -79,17 +90,17 @@ for e = 1:N
         errc = errc+1;
     else
         resx = res.x;
-        u_act = resx([1,2]);
+        ctrl = resx([1,2]);
     end
     
     
     %simulate 
-    x = simulate_state(step_size, x, u_act);
+    x = simulate_state(step_size, x, ctrl);
     [ x_r, phi_r, v_r ] = simulate_reference(step_size, x_r, phi_r, phi_rdot, v_r, v_rdot);
 
     %store
     x_t(1:3, e) = x;
-    x_t([4,5], e) = u_act;
+    x_t([4,5], e) = ctrl;
     x_rt(:, e) = x_r;
 
 
@@ -98,18 +109,12 @@ for e = 1:N
 
 
     % (p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
-    [ u1, u2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
-    u_act = [ u1; u2 ];
-    
-%     truncate u
-    u_max = [ max_v; max_u ];
-    u_act = sign(u_act) .* min(abs(u_act), u_max);
-    u_act(1) = max(u_act(1),0);
-    
-    % u = -Lf/Lg;
+    [ ctrl_lf1, ctrl_lf2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
+    ctrl = [ ctrl_lf1; ctrl_lf2 ];    
+    ctrl = constrain_u(ctrl, min_v, max_v, max_u);
     
     
-    [ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,u_act(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+    [ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
     [ Aclf, uclf ] = getCLFconstraints(x([1,2]),x_r,x(3),phi_r,phi_rdot,v_r,v_rdot); %(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
 
     h_t(e) = h;
@@ -134,12 +139,16 @@ for e = 1:N
     A = [ Acbf; Aclf; Av; Au ];
     u = [ ucbf; uclf; uv; uu ];
     
-    solver.update('Ax',A,'l',l,'u',u);
+
+    q = [ -2*R'*ctrl; 0 ];
+
+    
+    solver.update('Ax',A,'l',l,'u',u,'q',q);
 
     
 end
 
-
+%%% PLOTTING %%%
 
 t = 0:step_size:sim_time;
 t = t(1:e);
@@ -164,6 +173,14 @@ hold on
 plot(x_rt(1,:), x_rt(2,:), '-.', 'LineWidth',1, 'Color',[1, 0, 0],'DisplayName', 'Reference');
 viscircles(p_o', delta);
 axis equal
+
+%%% FUNCTIONS %%%
+
+function u = constrain_u(u,min_v,max_v,max_omega)
+    max_vals = [ max_v; max_omega ];
+    u = sign(u) .* min(abs(u), max_vals);
+    u(1) = max(u(1),min_v);    
+end
 
 function x_k_1 = simulate_state(time_step, x_k, u)
     phi = x_k(3);
