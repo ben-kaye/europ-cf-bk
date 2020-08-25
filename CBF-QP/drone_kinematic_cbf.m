@@ -116,13 +116,16 @@ for e = 1:Ns
     % [Lf, Lg, h] = getCBF(x([1,2]), x(3), p_o, v, max_u, delta, gamma);
 
 
+    v_old = ctrl(1);
+
     % (p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
     [ ctrl_lf1, ctrl_lf2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
     ctrl = [ ctrl_lf1; ctrl_lf2 ];    
     ctrl = constrain_u(ctrl, min_v, max_v, max_u);
     
     
-    [ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+    %%% USING v_old instead of ctrl_lf1
+    [ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,v_old,max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
     [ Aclf, uclf ] = getCLFconstraints(x([1,2]),x_r,x(3),phi_r,phi_rdot,v_r,v_rdot); %(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
     
     if h < 0 
