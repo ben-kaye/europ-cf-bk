@@ -10,7 +10,7 @@ max_u = 1.5;
 max_v = 4;
 relax_weight = 100;
 
-p_o = [ 3; 3 ];
+p_o = [ 5; 3 ];
 
 phi_0 = -1; % {rad}
 p_0 = [ 3; 2 ]; % {m; m}
@@ -33,15 +33,29 @@ u = [ u1; u2 ];
 %%% QP SETUP %%%
 solver = osqp;
 
-P = diag([1, 3, relax_weight]);
+P = diag([0, 0, relax_weight]);
 q = zeros(3,1);
 
 [ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,u(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
 [ Aclf, uclf ] = getCLFconstraints(x([1,2]),x_r,x(3),phi_r,phi_rdot,v_r,v_rdot); %(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
+lclf = -inf;
+lcbf = -inf;
 
-l = -inf*ones(2,1);
-A = [ Acbf; Aclf ];
-u = [ ucbf; uclf ];
+Av = [ 1, 0, 0 ];
+uv = max_v;
+lv = 0;
+
+Au = [ 0, 1, 0 ];
+uu = max_u;
+lu = -max_u;
+
+l = [ lclf; lv; lu ];
+A = [ Aclf; Av; Au ];
+u = [ uclf; uv; uu ];
+
+l = [ lcbf; lclf; lv; lu ];
+A = [ Acbf; Aclf; Av; Au ];
+u = [ ucbf; uclf; uv; uu ];
 
 solver.setup(P,q,A,l,u,'warm_start',true,'verbose',false);
 
@@ -65,17 +79,17 @@ for e = 1:N
         errc = errc+1;
     else
         resx = res.x;
-        u = resx([1,2]);
+        u_act = resx([1,2]);
     end
     
     
     %simulate 
-    x = simulate_state(step_size, x, u);
+    x = simulate_state(step_size, x, u_act);
     [ x_r, phi_r, v_r ] = simulate_reference(step_size, x_r, phi_r, phi_rdot, v_r, v_rdot);
 
     %store
     x_t(1:3, e) = x;
-    x_t([4,5], e) = u;
+    x_t([4,5], e) = u_act;
     x_rt(:, e) = x_r;
 
 
@@ -85,17 +99,17 @@ for e = 1:N
 
     % (p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
     [ u1, u2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
-    u = [ u1; u2 ];
+    u_act = [ u1; u2 ];
     
-    % truncate u
-%     u_max = [ max_v; max_u ];
-%     u = sign(u) .* min(abs(u), u_max);
-%     u(1) = max(u(1),0);
+%     truncate u
+    u_max = [ max_v; max_u ];
+    u_act = sign(u_act) .* min(abs(u_act), u_max);
+    u_act(1) = max(u_act(1),0);
     
     % u = -Lf/Lg;
     
     
-    [ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,u(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+    [ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,u_act(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
     [ Aclf, uclf ] = getCLFconstraints(x([1,2]),x_r,x(3),phi_r,phi_rdot,v_r,v_rdot); %(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
 
     h_t(e) = h;
@@ -111,6 +125,17 @@ for e = 1:N
        phi_rdot = 0;
        switched2 = true;
     end
+    
+    l = [ lclf; lv; lu ];
+    A = [ Aclf; Av; Au ];
+    u = [ uclf; uv; uu ];
+
+    l = [ lcbf; lclf; lv; lu ];
+    A = [ Acbf; Aclf; Av; Au ];
+    u = [ ucbf; uclf; uv; uu ];
+    
+    solver.update('Ax',A,'l',l,'u',u);
+
     
 end
 
@@ -178,7 +203,7 @@ function [ Acbf, ucbf, h ] = getCBFconstraints(p_xy, phi, p_o, v, max_u, delta, 
     
     z = p_o - p_c;
     
-    h = z'*z - delta^2;
+    h = z'*z - (v/max_u + delta)^2;
 
     LfBF = 2*z'*p_dot/h/(1+h);
 
