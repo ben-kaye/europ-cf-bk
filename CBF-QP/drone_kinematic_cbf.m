@@ -221,12 +221,8 @@ function [ Acbf, ucbf, h ] = getCBFconstraints(p_xy, phi, p_o, v, max_u, delta, 
     
     h = z'*z - (v/max_u + delta)^2;
 
-%     LfBF = 2*z'*p_dot/h/(1+h);
+    LfBF = 2*z'*p_dot/h/(1+h);
     
-    % testing here : be prepared to remove
-    %%% SEEMS TO BE AN ISSUE WITH SIGN 
-    LfBF = -2*z'*p_dot/h/(1+h);
-
     LgBF = sign_term*LfBF/max_u;
     
     BF = -log(h/(1+h));
