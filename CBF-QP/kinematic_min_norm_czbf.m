@@ -126,10 +126,10 @@ for e = 1:Ns
     ctrl = constrain_u(ctrl, min_v, max_v, max_u);
     
     %%% USING v_old instead of ctrl_lf1
-    [ Aczbf, uczbf, h ] = getCZBFconstraints(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+    [ Aczbf, uczbf, h ] = getCZBFconstraints(x([1,2]),x(3),p_o,v_old,max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
 
     if h < 0 
-        error('Safety violated')
+        % error('Safety violated')
     end
     
     h_t(e) = h;
@@ -205,7 +205,7 @@ function [x_rk1, phi_rk1, v_rk1] = simulate_reference(time_step, x_rk, phi_rk, p
 end
 
 function [ Aczbf, uczbf, h ] = getCZBFconstraints(p_xy, phi, p_o, v, max_turn, delta, gamma)
-    p_dot = v * [ -sin(phi); cos(phi) ];
+    p_dot = v * [ cos(phi); sin(phi) ];
 
     p_xo = p_o - p_xy;
     
