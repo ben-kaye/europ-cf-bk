@@ -13,6 +13,7 @@ def ref_step(r, step_sz):
     phi_r = r[2]
 
     r_dot = np.array(((np.cos(phi_r), 0), (np.sin(phi_r), 0), (0, 1)))
+
     return r + step_sz*np.hstack([r_dot.dot(r[[4,3]]), 0, r[5], 0])  
     
 def saturate_ctrls(u, max_turn, v_min, v_max):
@@ -21,11 +22,11 @@ def saturate_ctrls(u, max_turn, v_min, v_max):
     v = min(v, v_max)
 
     omega = u[1]
-    omega = np.sign(omega)*max(abs(omega), max_turn)
+    omega = np.sign(omega)*min(abs(omega), max_turn)
 
     return np.array((v, omega))
 
-def get_sig_bf_constr(x, u, p_o, max_turn, delta):
+def get_sig_bf_constr(x, u, p_o, max_turn, delta, a):
     p = x[:2]
     phi = x[2]
     v = u[0]
@@ -45,9 +46,11 @@ def get_sig_bf_constr(x, u, p_o, max_turn, delta):
 
     h = z.dot(z) - (delta + R_min)**2
 
-    q = np.exp(1/h**2)
-
-    sig = (q - 1)/(q + 1)
+    if abs(h/a) <= 0.4:
+        sig = 1
+    else:
+        q = np.exp((a/h)**2)
+        sig = (q - 1)/(q + 1)    
 
     # Abf = np.array((0, -1))
     ubf = sig*sign_r*max_turn

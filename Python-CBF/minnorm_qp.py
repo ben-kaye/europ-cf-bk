@@ -9,16 +9,20 @@ import qpfuncs as qp
 # r in Re(6x1) { r_x, r_y, r_phi, r_phidot, r_v, r_vdot } {}
 # u in Re(2x1) { v, omega }
 
+# Implementing min-norm QP with sigmoid constraint based BF
+
 sim_time = 10
 step_size = 1e-4
 Ts = 1e-3
 
-k1 = 5
+k1 = 3
 k2 = 5
 max_turn = 1.5
 v_min = 0.01
 v_max = 12
 delta = 0.4
+a = 10
+
 
 x = np.array((3, 2, -np.radians(30))) # init state
 r = np.array((2, 3, np.radians(60), 0.5, 1, 0)) # init reference signal
@@ -48,7 +52,7 @@ uturn = max_turn
 
 Abf = sparse.csr_matrix(np.array((0, -1)))
 lbf = -np.inf
-ubf = qp.get_sig_bf_constr(x, ctrl_u, p_o, max_turn, delta)
+ubf = qp.get_sig_bf_constr(x, ctrl_u, p_o, max_turn, delta,a)
 
 A = sparse.vstack([Av, Aturn, Abf], format='csc')
 l = np.hstack([lv, lturn, lbf])
@@ -59,7 +63,7 @@ q = -2*P.dot(ctrl_u)
 
 solver = osqp.OSQP()
 
-solver.setup(P, q, A, l, u, warm_start = True, verbose = False)
+solver.setup(P, q, A, l, u, warm_start = False, verbose = False)
 
 for i in range(Ns):
     # solve
@@ -80,11 +84,13 @@ for i in range(Ns):
     rt[i] = r[:3]
     ut[i] = ctrl_u
 
+    ctrl_temp = ctrl_u
+
     # update
     ctrl_u = qp.clf_controls(x, r, k1, k2)
-    ctrl_u = qp.saturate_ctrls(u, max_turn, v_min, v_max)
+    ctrl_u = qp.saturate_ctrls(ctrl_u, max_turn, v_min, v_max)
 
-    u[2] = qp.get_sig_bf_constr(x, ctrl_u, p_o, max_turn, delta)
+    u[2] = qp.get_sig_bf_constr(x, ctrl_temp, p_o, max_turn, delta, a) # note using v_temp instead of ctrl_u
 
     q = -2*P.dot(ctrl_u)
 
@@ -92,3 +98,5 @@ for i in range(Ns):
 
 # write to .csv for matlab plotting
 sp.io.savemat('H:\\Files\\EUROP-MATLAB\\Python-CBF\\result.mat', {'x_t': xt, 'r_t': rt, 'u_t': ut, 'p_o': p_o, 'delta': delta})
+
+print('Solved')
