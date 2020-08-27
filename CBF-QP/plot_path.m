@@ -22,5 +22,5 @@ py = x_t(2,:);
 plot(px,py,'-','LineWidth',1.5, 'Color',1/255*[64, 201, 255], 'DisplayName', 'Position');
 hold on
 plot(x_rt(1,:), x_rt(2,:), '-.', 'LineWidth',1, 'Color',[0.3, 0.3, 0.3],'DisplayName', 'Reference');
-viscircles(p_o', delta);
+viscircles(p_o', delta, 'LineStyle', '-.');
 axis equal
