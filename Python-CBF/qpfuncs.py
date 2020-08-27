@@ -5,15 +5,15 @@ from scipy import sparse
 def sim_step(x, u, step_sz):
     phi = x[2]
 
-    Ax = np.array((np.cos(phi), 0),(np.sin(phi), 0),(0, 1))
+    Ax = np.array(((np.cos(phi), 0),(np.sin(phi), 0),(0, 1)))
 
     return x + step_sz*Ax.dot(u)
 
 def ref_step(r, step_sz):
     phi_r = r[2]
 
-    r_dot = np.array((np.cos(phi_r), 0),(np.sin(phi_r), 0),(0, 1))
-    return r + step_sz*np.vstack(r_dot(r[:3]), 0, r[4], 0)  
+    r_dot = np.array(((np.cos(phi_r), 0), (np.sin(phi_r), 0), (0, 1)))
+    return r + step_sz*np.hstack([r_dot.dot(r[[4,3]]), 0, r[5], 0])  
     
 def saturate_ctrls(u, max_turn, v_min, v_max):
     v = u[0]

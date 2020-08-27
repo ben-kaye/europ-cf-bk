@@ -2,10 +2,11 @@ import osqp
 import numpy as np
 import scipy as sp
 from scipy import sparse
+from scipy.io import savemat
 import qpfuncs as qp
 
 # x in Re(3x1) { p_x, p_y, phi }
-# r in Re(6x1) { r_x, r_y, r_phi, r_phidot, r_v, r_vdot }
+# r in Re(6x1) { r_x, r_y, r_phi, r_phidot, r_v, r_vdot } {}
 # u in Re(2x1) { v, omega }
 
 sim_time = 10
@@ -19,7 +20,7 @@ v_min = 0.01
 v_max = 12
 delta = 0.4
 
-x = np.array((0.3, 1.2, -np.radians(10))) # init state
+x = np.array((3, 2, -np.radians(30))) # init state
 r = np.array((2, 3, np.radians(60), 0.5, 1, 0)) # init reference signal
 p_o = np.array((-1, 6)) # init object pos
 
@@ -28,9 +29,9 @@ p_o = np.array((-1, 6)) # init object pos
 N = int(sim_time/step_size)
 Ns = int(sim_time/Ts)
 
-xt = np.zeros(Ns)
-rt = np.zeros(Ns)
-ut = np.zeros(Ns)
+xt = np.zeros([Ns,3])
+rt = np.zeros([Ns,3])
+ut = np.zeros([Ns,2])
 
 # qp set up
 
@@ -76,7 +77,7 @@ for i in range(Ns):
 
     # capture state
     xt[i] = x
-    rt[i] = r
+    rt[i] = r[:3]
     ut[i] = ctrl_u
 
     # update
@@ -88,3 +89,6 @@ for i in range(Ns):
     q = -2*P.dot(ctrl_u)
 
     solver.update(u=u, q=q)
+
+# write to .csv for matlab plotting
+sp.io.savemat('H:\\Files\\EUROP-MATLAB\\Python-CBF\\result.mat', {'x_t': xt, 'r_t': rt, 'u_t': ut, 'p_o': p_o, 'delta': delta})
