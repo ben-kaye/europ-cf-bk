@@ -165,6 +165,13 @@ for e = 1:Ns
     
 end
 
+if(errc > 0)
+    fprintf('Sim complete. %d errors encountered\n', errc);
+else
+    fprintf('Sim complete.');
+end
+
+
 %%% PLOTTING %%%
 
 t = 0:step_size:sim_time;

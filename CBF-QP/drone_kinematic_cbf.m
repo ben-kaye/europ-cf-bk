@@ -94,6 +94,7 @@ for e = 1:Ns
     if res.info.status_val ~= 1
         %%% ERROR %%%
         errc = errc+1;
+        error('Primal infeasibility')
     else
         resx = res.x;
         ctrl = resx([1,2]);
@@ -161,6 +162,12 @@ for e = 1:Ns
     solver.update('Ax',A,'l',l,'u',u,'q',q);
 
     
+end
+
+if(errc > 0)
+    fprintf('Sim complete. %d errors encountered\n', errc);
+else
+    fprintf('Sim complete.');
 end
 
 %%% PLOTTING %%%
