@@ -66,15 +66,15 @@ def clf_controls(x, r, k1, k2):
     e3 = phi_r - phi
     c = np.cos(phi)
     s = np.sin(phi)
-    e12 = np.array(((c, s), (-s, c))).dot(p_r - p)
+    e1, e2 = np.array(((c, s), (-s, c))).dot(p_r - p)
 
-    alpha = np.arctan(e12[1]/v_r)
+    alpha = np.arctan(e2/v_r)
     e3_aux = e3 + alpha
 
-    fr = (v_r**2 + e12[1]**2) 
+    fr = (v_r**2 + e2**2) 
 
-    omega = phi_rdot + 2*e12[1]*v_r*np.cos(e3_aux/2 - alpha) + (v_r**2*np.sin(e3) - e12[1]*v_rdot)/fr + k2*np.sin(e3_aux/2)
-    v = v_r*np.cos(e3) - omega*v_r*np.sin(e3_aux/2)/fr + k1*e12[0]
+    omega = phi_rdot + 2*e2*v_r*np.cos(e3_aux/2 - alpha) + (v_r**2*np.sin(e3) - e2*v_rdot)/fr + k2*np.sin(e3_aux/2)
+    v = v_r*np.cos(e3) - omega*v_r*np.sin(e3_aux/2)/fr + k1*e1
 
     return np.array((v, omega))
     
