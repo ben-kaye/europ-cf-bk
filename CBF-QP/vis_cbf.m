@@ -16,17 +16,23 @@ function vis(p, p_o, phi, v, max_turn, delta)
     
     vel_vis = [ p, p + p_dot ];
     
+    z = p_o - p_c;
+    
+    h = z'*z - (v/max_turn + delta)^2;
+    
     figure(1)
     hold off
-    viscircles( p_c', Rmin, 'LineStyle', '-.');
+    viscircles( p_c', Rmin, 'LineStyle', '-.', 'Color', 1/255*[242, 113, 7]);
 
 
     hold on
     viscircles( p_o', delta, 'LineStyle', '-.');
     plot( vel_vis(1,:),vel_vis(2,:), '-', 'LineWidth',1,'Color',1/255*[223, 58, 252], 'DisplayName', 'Velocity Vector');
-    plot( p_c(1), p_c(2), '+', 'MarkerSize', 20, 'DisplayName', 'Object');
-    plot( p_o(1), p_o(2), '+', 'MarkerSize', 20, 'DisplayName', 'Manoeuvre Centre');
+    plot( p_c(1), p_c(2), '+', 'MarkerSize', 20, 'DisplayName', 'Manoeuvre Centre');
+    plot( p_o(1), p_o(2), '+', 'MarkerSize', 20, 'DisplayName', 'Object');
     plot( p(1),p(2), '+', 'MarkerSize', 20, 'DisplayName', 'Position');
+    
+    title(sprintf('h = %f',h));
 
     axis equal
     legend()
