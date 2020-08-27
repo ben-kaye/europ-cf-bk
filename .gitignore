@@ -1,6 +1,9 @@
 /osqp/
 /slprj/
 
+/.*/
+/_*/
+
 *.mat
 *.slxc
 *.l
