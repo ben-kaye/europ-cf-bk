@@ -27,6 +27,8 @@ min_v = 0.1; % {ms-1}
 relax_weight = 10; % relax penalty
 R = diag([ 1, 1 ]); % control penalty
 gamma = 100;
+K1 = 5;
+K2 = 5;
 
 %%% REFERENCE SIGNAL GENERATION %%%
 
@@ -38,26 +40,26 @@ v_r = 1;
 v_rdot = 0;
 
 % compute CLF input to track ref
-[ ctrl1, ctrl2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
+[ ctrl1, ctrl2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot,K1,K2);
 ctrl = [ ctrl1; ctrl2 ];
 ctrl = constrain_u(ctrl, min_v, max_v, max_u); % {ms-1; rads-1} control vector
 
 %%% QP SETUP %%%
 solver = osqp;
 
-[ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
-[ Aclf, uclf ] = getCLFconstraints(x([1,2]),x_r,x(3),phi_r,phi_rdot,v_r,v_rdot); %(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
-lclf = -inf;
-lcbf = -inf;
+[ Aczbf, uczbf, h ] = getCZBFconstraints(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+lczbf = -inf;
 
-P = blkdiag(R,relax_weight);
-q = [ -2*R'*ctrl; 0 ];
+% P = blkdiag(R,relax_weight);
+P = R;
+% q = [ -2*R'*ctrl; 0 ];
+q = -2*R'*ctrl;
 
-Av = [ 1, 0, 0 ];
+Av = [ 1, 0 ];
 uv = max_v;
 lv = min_v; % might rather, do 0
 
-Au = [ 0, 1, 0 ];
+Au = [ 0, 1 ];
 uu = max_u;
 lu = -max_u;
 
@@ -65,9 +67,9 @@ lu = -max_u;
 % A = [ Aclf; Av; Au ];
 % u = [ uclf; uv; uu ];
 
-l = [ lcbf; lclf; lv; lu ];
-A = [ Acbf; Aclf; Av; Au ];
-u = [ ucbf; uclf; uv; uu ];
+l = [ lczbf; lv; lu ];
+A = [ Aczbf; Av; Au ];
+u = [ uczbf; uv; uu ];
 
 solver.setup(P,q,A,l,u,'warm_start',true,'verbose',false);
 
@@ -119,15 +121,13 @@ for e = 1:Ns
     v_old = ctrl(1);
 
     % (p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
-    [ ctrl_lf1, ctrl_lf2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
+    [ ctrl_lf1, ctrl_lf2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot, K1,K2);
     ctrl = [ ctrl_lf1; ctrl_lf2 ];    
     ctrl = constrain_u(ctrl, min_v, max_v, max_u);
     
-    
     %%% USING v_old instead of ctrl_lf1
-    [ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,v_old,max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
-    [ Aclf, uclf ] = getCLFconstraints(x([1,2]),x_r,x(3),phi_r,phi_rdot,v_r,v_rdot); %(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
-    
+    [ Aczbf, uczbf, h ] = getCZBFconstraints(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+
     if h < 0 
         error('Safety violated')
     end
@@ -150,13 +150,13 @@ for e = 1:Ns
 %     A = [ Aclf; Av; Au ];
 %     u = [ uclf; uv; uu ];
 
-    l = [ lcbf; lclf; lv; lu ];
-    A = [ Acbf; Aclf; Av; Au ];
-    u = [ ucbf; uclf; uv; uu ];
-    
+    l = [ lczbf; lv; lu ];
+    A = [ Aczbf; Av; Au ];
+    u = [ uczbf; uv; uu ];
 
-    q = [ -2*R'*ctrl; 0 ];
 
+    % q = [ -2*R'*ctrl; 0 ];
+    q = -2*R'*ctrl;
     
     solver.update('Ax',A,'l',l,'u',u,'q',q);
 
@@ -204,8 +204,8 @@ function [x_rk1, phi_rk1, v_rk1] = simulate_reference(time_step, x_rk, phi_rk, p
     v_rk1 = max(v_rk1, 0);
 end
 
-function [ Acbf, ucbf, h ] = getCBFconstraints(p_xy, phi, p_o, v, max_u, delta, gamma)
-    p_dot = v * [ cos(phi); sin(phi) ];
+function [ Aczbf, uczbf, h ] = getCZBFconstraints(p_xy, phi, p_o, v, max_turn, delta, gamma)
+    p_dot = v * [ -sin(phi); cos(phi) ];
 
     p_xo = p_o - p_xy;
     
@@ -213,52 +213,27 @@ function [ Acbf, ucbf, h ] = getCBFconstraints(p_xy, phi, p_o, v, max_u, delta, 
 
 
     % cross(p_dot, k)
-    r = sign_term*[ 0, 1; -1, 0 ] * p_dot / max_u;
+    r = sign_term*[ 0, 1; -1, 0 ] * p_dot / max_turn;
 
     p_c = p_xy + r;
     
     z = p_o - p_c;
     
-    h = z'*z - (v/max_u + delta)^2;
+    h = z'*z - (v/max_turn + delta)^2;
 
-    LfBF = 2*z'*p_dot/h/(1+h);
-    
-    LgBF = sign_term*LfBF/max_u;
-    
-    BF = -log(h/(1+h));
-    
-   
-    
-    
-    % %Trying something new here:
-    % Acbf = [ LfBF/v, LgBF, 0 ];
-    % ucbf = gamma/BF;
+    Lfh = -2*z'*p_dot;
 
-    Acbf = [ 0, LgBF, 0 ];
-    ucbf = gamma/BF - LfBF; 
-end
-
-function [ Aclf, uclf ] = getCLFconstraints(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
-    e3 = phi_r - phi;
-    e12 = [ cos(phi) sin(phi); -sin(phi) cos(phi) ] * (p_r - p_xy);
-    e2 = e12(2);
-    e1 = e12(1);
-
-    alpha = atan(e2/v_r);
-    e3_aux = alpha + e3;
+    Lgh = sign_term*Lfh/max_turn;
     
-    V = 1/2*e1^2 + 1/2*e2^2 + 2*(1-cos(e3_aux/2));
+    alpha = gamma*h;
 
-    LfV = v_r*(e1*cos(e3) - e2*sin(alpha)) +  sin(e3_aux/2)*(phi_rdot + 2*e2*v_r*cos(e3_aux/2 - alpha) + (v_r^2*sin(e3) - e2*v_rdot)/(v_r^2 + e2^2));
-    LgV = [ -e1, -sin(e3_aux/2)*(1 + e1*v_r/(v_r^2+e2^2)) ];
-    
-    Aclf = [ LgV, -1 ];
-%     uclf = -LfV;
-    uclf = -V - LfV;
+    Aczbf = [ 0, -Lgh ];
+    uczbf = alpha + Lfh;
 
 end
 
-function [ u1, u2 ] = controlFromCLF(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
+
+function [ u1, u2 ] = controlFromCLF(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot, k1, k2)
     e3 = phi_r - phi;
     e12 = [ cos(phi) sin(phi); -sin(phi) cos(phi) ] * (p_r - p_xy);
 
@@ -267,17 +242,7 @@ function [ u1, u2 ] = controlFromCLF(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdo
 
     alpha = atan(e2/v_r);
     e3_aux = alpha + e3;
-
-    k1 = 5;
-    k2 = 5;
 
     u2 = phi_rdot + 2*e2*v_r*cos(e3_aux/2-alpha) + (v_r^2*sin(e3) - e2*v_rdot)/(v_r^2 + e2^2) + k2*sin(e3_aux/2);
     u1 = v_r*cos(e3) - u2*v_r*sin(e3_aux/2)/(v_r^2 + e2^2) + k1*e1;
-
-
-%     alpha = atan(v_r*e2);
-%     e3_aux = alpha + e3;
-%     
-%     u2 = phi_rdot + 2*e2*v_r*cos(e3_aux/2-alpha) + (e2*v_r*sin(e3) + e2*v_rdot)/(1 + (v_r * e2)^2) + k2*sin(e3_aux/2);
-%     u1 = v_r*cos(e3) - u2*v_r*sin(e3_aux/2)/(1 + (v_r * e2)^2) + k1*e1;
 end

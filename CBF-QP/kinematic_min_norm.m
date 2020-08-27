@@ -51,14 +51,16 @@ solver = osqp;
 lclf = -inf;
 lcbf = -inf;
 
-P = blkdiag(R,relax_weight);
-q = [ -2*R'*ctrl; 0 ];
+% P = blkdiag(R,relax_weight);
+P = R;
+% q = [ -2*R'*ctrl; 0 ];
+q = -2*R'*ctrl;
 
-Av = [ 1, 0, 0 ];
+Av = [ 1, 0 ];
 uv = max_v;
 lv = min_v; % might rather, do 0
 
-Au = [ 0, 1, 0 ];
+Au = [ 0, 1 ];
 uu = max_u;
 lu = -max_u;
 
@@ -155,8 +157,8 @@ for e = 1:Ns
     u = [ ucbf; uv; uu ];
     
 
-    q = [ -2*R'*ctrl; 0 ];
-
+    % q = [ -2*R'*ctrl; 0 ];
+    q = -2*R'*ctrl;
     
     solver.update('Ax',A,'l',l,'u',u,'q',q);
 
@@ -205,7 +207,7 @@ function [x_rk1, phi_rk1, v_rk1] = simulate_reference(time_step, x_rk, phi_rk, p
 end
 
 function [ Acbf, ucbf, h ] = getCBFconstraints(p_xy, phi, p_o, v, max_u, delta, gamma)
-    p_dot = v * [ -sin(phi); cos(phi) ];
+    p_dot = v * [ cos(phi); sin(phi) ];
 
     p_xo = p_o - p_xy;
     
@@ -221,10 +223,6 @@ function [ Acbf, ucbf, h ] = getCBFconstraints(p_xy, phi, p_o, v, max_u, delta, 
     
     h = z'*z - (v/max_u + delta)^2;
 
-%     LfBF = 2*z'*p_dot/h/(1+h);
-    
-    % testing here : be prepared to remove
-    %%% SEEMS TO BE AN ISSUE WITH SIGN 
     LfBF = 2*z'*p_dot/h/(1+h);
 
     LgBF = sign_term*LfBF/max_u;
@@ -238,7 +236,7 @@ function [ Acbf, ucbf, h ] = getCBFconstraints(p_xy, phi, p_o, v, max_u, delta, 
     % Acbf = [ LfBF/v, LgBF, 0 ];
     % ucbf = gamma/BF;
 
-    Acbf = [ 0, LgBF, 0 ];
+    Acbf = [ 0, LgBF ];
     ucbf = gamma/BF - LfBF; 
 end
 
