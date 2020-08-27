@@ -40,8 +40,8 @@ v_r = 1;
 v_rdot = 0;
 
 % compute CLF input to track ref
-[ ctrl1, ctrl2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot,K1,K2);
-ctrl = [ ctrl1; ctrl2 ];
+[ ctrl_lf1, ctrl_lf2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot,K1,K2);
+ctrl = [ ctrl_lf1; ctrl_lf2 ];
 ctrl = constrain_u(ctrl, min_v, max_v, max_u); % {ms-1; rads-1} control vector
 
 %%% QP SETUP %%%
@@ -71,7 +71,7 @@ l = [ lbf; lv; lu ];
 A = [ Abf; Av; Au ];
 u = [ ubf; uv; uu ];
 
-solver.setup(P,q,A,l,u,'warm_start',true,'verbose',false);
+solver.setup(P,q,Abf,lbf,ubf,'warm_start',true,'verbose',false);
 
 %%% SIMULATION %%%
 
@@ -96,6 +96,7 @@ for e = 1:Ns
     if res.info.status_val ~= 1
         %%% ERROR %%%
         errc = errc+1;
+        error('Primal infeasibility')
     else
         resx = res.x;
         ctrl = resx([1,2]);
@@ -146,19 +147,17 @@ for e = 1:Ns
        switched2 = true;
     end
     
-%     l = [ lclf; lv; lu ];
-%     A = [ Aclf; Av; Au ];
-%     u = [ uclf; uv; uu ];
 
-    l = [ lbf; lv; lu ];
-    A = [ Abf; Av; Au ];
-    u = [ ubf; uv; uu ];
+%     l = [ lbf; lv; lu ];
+%     A = [ Abf; Av; Au ];
+%     u = [ ubf; uv; uu ];
+
 
 
     % q = [ -2*R'*ctrl; 0 ];
     q = -2*R'*ctrl;
     
-    solver.update('Ax',A,'l',l,'u',u,'q',q);
+    solver.update('Ax',Abf,'l',lbf,'u',ubf,'q',q);
 
     
 end
@@ -231,7 +230,7 @@ function [ Abf, ubf, h ] = getBFconstraint(p_xy, phi, p_o, v, max_turn, delta, g
 end
 
 
-function [ u1, u2 ] = controlFromCLF(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot, k1, k2)
+function [ v, omega ] = controlFromCLF(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot, k1, k2)
     e3 = phi_r - phi;
     e12 = [ cos(phi) sin(phi); -sin(phi) cos(phi) ] * (p_r - p_xy);
 
@@ -241,6 +240,6 @@ function [ u1, u2 ] = controlFromCLF(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdo
     alpha = atan(e2/v_r);
     e3_aux = alpha + e3;
 
-    u2 = phi_rdot + 2*e2*v_r*cos(e3_aux/2-alpha) + (v_r^2*sin(e3) - e2*v_rdot)/(v_r^2 + e2^2) + k2*sin(e3_aux/2);
-    u1 = v_r*cos(e3) - u2*v_r*sin(e3_aux/2)/(v_r^2 + e2^2) + k1*e1;
+    omega = phi_rdot + 2*e2*v_r*cos(e3_aux/2-alpha) + (v_r^2*sin(e3) - e2*v_rdot)/(v_r^2 + e2^2) + k2*sin(e3_aux/2);
+    v = v_r*cos(e3) - omega*v_r*sin(e3_aux/2)/(v_r^2 + e2^2) + k1*e1;
 end
