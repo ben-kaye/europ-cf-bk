@@ -11,7 +11,7 @@ Ns = floor(sim_time/Ts);
 x = [ 3; 2; -3*pi/18 ]; % { p_x, p_y, phi }
 r = [ 2; 3; pi/3; 0.5; 1; 0]; % { r_x, r_y, phi_r, phi_rdot, v_r, v_rdot }
 p_o = [ -1; 6 ];
-delta = 0.4;
+delta = 0.8;
 v_min = 1e-3;
 v_max = 4;
 omeg_max = 1.5;
@@ -29,7 +29,7 @@ ctrls = [v_ctrl; omeg_ctrl];
 ctrls = sat_ctrls(ctrls, [v_min; -omeg_max], [v_max; omeg_max]);
 
 % (x, v_last, max_turn, p_o, delta, gamma)
-[ Abf, ubf] = augmented_zbf(x, ctrls(1), p_o, delta, q_gamma);
+[ Abf, ubf] = augmented_zbf(x, p_o, delta, q_gamma);
 
 H = diag([1, 1]);
 f = -H'*ctrls;
@@ -60,7 +60,7 @@ for e = 1:Ns
     r_t(:,e) = r([1,2]);
     u_t(:,e) = ctrls;
     
-    [ Abf, ubf, h] = augmented_zbf(x, ctrls(1), p_o, delta, q_gamma);
+    [ Abf, ubf, h] = augmented_zbf(x, p_o, delta, q_gamma);
     
     if h > 50
         h_t(e) = NaN;
