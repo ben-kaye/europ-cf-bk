@@ -34,10 +34,10 @@ ctrls = sat_ctrls(ctrls, [v_min; -omeg_max], [v_max; omeg_max]);
 H = diag([1, 1]);
 f = -H'*ctrls;
 
-x_t = zeros(2, Ns);
-r_t = zeros(2, Ns);
-u_t = zeros(2, Ns);
-h_t = zeros(1, Ns);
+x_t = NaN*ones(2, Ns);
+r_t = NaN*ones(2, Ns);
+u_t = NaN*ones(2, Ns);
+h_t = NaN*ones(1, Ns);
 
 options =  optimset('Display','off');
 
@@ -62,11 +62,8 @@ for e = 1:Ns
     
     [ Abf, ubf, h] = augmented_zbf(x, p_o, delta, q_gamma);
     
-    if h > 50
-        h_t(e) = NaN;
-    else 
-        h_t(e) = h;
-    end
+    h_t(e) = h;
+
     [v_ctrl, omeg_ctrl] = clf_control(x, r, k1, k2);
     ctrls = [v_ctrl; omeg_ctrl];
     ctrls = sat_ctrls(ctrls, [v_min; -omeg_max], [v_max; omeg_max]);
@@ -75,9 +72,13 @@ for e = 1:Ns
 end
 
 plot_res
+animate_pos
+
 
 t = 0:step_size*N/Ns:sim_time;
 t = t(1:end-1);
 figure(3)
 plot(t, h_t);
+
+
 
