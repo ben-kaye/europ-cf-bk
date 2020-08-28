@@ -80,4 +80,32 @@ def clf_controls(x, r, k1, k2):
     v = v_r*np.cos(e3) - omega*v_r*np.sin(e3_aux/2)/fr + k1*e1
 
     return np.array((v, omega))
-    
+
+def rcbf_constraints(x, v_last, p_o, max_turn, delta, gamma):
+    p = x[:2]
+    phi = x[2]
+    p_xo = p_o - p
+
+    dir_v = np.array((np.cos(phi), np.sin(phi)))   
+
+    cross_k = np.array(((0, 1),(-1, 0))) 
+    r_sign = np.sign(dir_v.dot(cross_k.dot(p_xo)))
+
+    R_min = v_last/max_turn
+
+    # note here cross_k represents dot(p) x k
+    r = r_sign*R_min*cross_k.dot(dir_v)
+
+    z = p_o - r
+
+    h = z.dot(z) - (R_min + delta)**2
+
+    B = -np.log(h/(1 + h))
+
+    LfB = 2*z.dot(dir_v)*v_last/h/(1 + h)
+    LgB = 2*z.dot(dir_v)*R_min*r_sign/h/(1 + h)
+
+    Arcbf = np.array((0, LgB))
+    urcbf = gamma/B - LfB
+
+    return Arcbf, urcbf
