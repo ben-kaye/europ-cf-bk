@@ -1,7 +1,10 @@
 fig = figure(3);
 
 maxy = max( max(x_t(2,:)), p_o(2) + delta );
-axis_lims = [ min(x_t(1,:)), max(x_t(1,:)),min(x_t(2,:)), maxy ];
+miny = min( min(x_t(2,:)), p_o(2) - delta );
+maxx = max( max(x_t(1,:)), p_o(1) + delta );
+minx = min( min(x_t(1,:)), p_o(1) - delta );
+axis_lims = [ minx, maxx, miny, maxy ];
 
 fps = 30;
 Nf = ceil(Ns/sim_time/fps);

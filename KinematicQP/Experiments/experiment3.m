@@ -14,7 +14,7 @@ p_o = [ 1; 0.5 ]; % {m, m}
 
 path_id = 1;
 
-delta = 0.1; % {m}
+delta = 0.9; % {m}
 v_min = 0; % {ms-1}
 v_max = 3; % {ms-1}
 % omeg_max = 1.5; % {rads-1}
@@ -24,7 +24,7 @@ gamma = 3;
 k1 = 5;
 k2 = 5;
 
-BF = @zbf2;
+BF = @zbf1;
 
 [x_t, u_t, r_t, h_t, errs] = bf_qp(BF, sim_time, step_size, Ts, x0, r0, path_id, p_o, delta, v_min, v_max, omeg_max, gamma, k1, k2);
 
