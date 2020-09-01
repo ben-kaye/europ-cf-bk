@@ -96,7 +96,7 @@ def rcbf_constraints(x, v_last, p_o, max_turn, delta, gamma):
     # note here cross_k represents dot(p) x k
     r = r_sign*R_min*cross_k.dot(dir_v)
 
-    z = p_o - r
+    z = p_xo - r
 
     h = z.dot(z) - (R_min + delta)**2
 

@@ -11,9 +11,9 @@ x = [ 3; 2; -3*pi/18 ]; % [ p_x, p_y, phi ]
 r = [ 2; 3; pi/3; 0.5; 1; 0]; % [ r_x, r_y, phi_r, phi_rdot, v_r, v_rdot ]
 p_o = [ -1; 6 ]; % {m, m}
 
-delta = 0.8; % {m}
-v_min = 1e-3; % {ms-1}
-v_max = 4; % {ms-1}
+delta = 1.3; % {m}
+v_min = 0; % {ms-1}
+v_max = 3; % {ms-1}
 omeg_max = 1.5; % {rads-1}
 q_gamma = 3;
 
@@ -86,11 +86,6 @@ end
 
 %%% PLOT %%%
 
+plot_ctrls
 plot_res
 animate_pos
-
-t = 0:step_size*N/Ns:sim_time;
-t = t(1:end-1);
-figure(3)
-plot(t, h_t);
-yline(0, 'LineStyle','-.','Color',[1,0,0])

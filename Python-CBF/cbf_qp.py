@@ -65,14 +65,21 @@ solver = osqp.OSQP()
 
 solver.setup(P, q, A, l, u, warm_start = False, verbose = False)
 
+errc = 0
+
 for i in range(Ns):
     # solve
     res = solver.solve()
 
-    if res.info.status != 'solved':
-        raise ValueError('OSQP did not solve the problem!')
-
     ctrl_u = res.x
+
+    if res.info.status != 'solved':
+        # raise ValueError('OSQP did not solve the problem!')
+        errc = errc + 1
+        ctrl_u = qp.clf_controls(x, r, k1, k2)
+        ctrl_u = qp.saturate_ctrls(ctrl_u, max_turn, v_min, v_max)
+
+    
 
     # simulate
     for j in range(int(N/Ns)):
@@ -99,6 +106,8 @@ for i in range(Ns):
     q = -2*P.dot(ctrl_u)
 
     indices = np.array((((int(2),int(0)),(int(2),int(1)))))
+    # try
+    # indices = np.array((2))
 
     solver.update(Ax=Arcbf,Ax_idx=indices, u=u, q=q)
 

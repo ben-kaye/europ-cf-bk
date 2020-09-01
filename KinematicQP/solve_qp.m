@@ -35,9 +35,9 @@ ctrls = sat_ctrls(ctrls, [v_min; -omeg_max], [v_max; omeg_max]);
 H = diag([1, 1]);
 f = -H'*ctrls;
 
-x_t = zeros(2, Ns);
-r_t = zeros(2, Ns);
-u_t = zeros(2, Ns);
+x_t = NaN*ones(2, Ns);
+r_t = NaN*ones(2, Ns);
+u_t = NaN*ones(2, Ns);
 
 options =  optimset('Display','off');
 

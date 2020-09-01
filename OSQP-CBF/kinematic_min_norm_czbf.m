@@ -5,6 +5,10 @@
 % *                                                                     *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
+% Implements sequential min-norm QP where the norm is the diff between 
+% the control input subject to BF safety constraint and the ideal CLF input.
+% The BF is the ZCBF h(x) with alpha(h) = h
+
 clear
 
 %%% SIMULATION PARAMETERS %%%
@@ -26,7 +30,7 @@ max_v = 12; % {ms-1}
 min_v = 0.1; % {ms-1}
 relax_weight = 10; % relax penalty
 R = diag([ 1, 1 ]); % control penalty
-gamma = 100;
+gamma = 1;
 K1 = 5;
 K2 = 5;
 
@@ -47,9 +51,8 @@ ctrl = constrain_u(ctrl, min_v, max_v, max_u); % {ms-1; rads-1} control vector
 %%% QP SETUP %%%
 solver = osqp;
 
-[ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
-lclf = -inf;
-lcbf = -inf;
+[ Aczbf, uczbf, h ] = getCZBFconstraints(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+lczbf = -inf;
 
 % P = blkdiag(R,relax_weight);
 P = R;
@@ -68,9 +71,9 @@ lu = -max_u;
 % A = [ Aclf; Av; Au ];
 % u = [ uclf; uv; uu ];
 
-l = [ lcbf; lv; lu ];
-A = [ Acbf; Av; Au ];
-u = [ ucbf; uv; uu ];
+l = [ lczbf; lv; lu ];
+A = [ Aczbf; Av; Au ];
+u = [ uczbf; uv; uu ];
 
 solver.setup(P,q,A,l,u,'warm_start',true,'verbose',false);
 
@@ -126,12 +129,11 @@ for e = 1:Ns
     ctrl = [ ctrl_lf1; ctrl_lf2 ];    
     ctrl = constrain_u(ctrl, min_v, max_v, max_u);
     
-    
     %%% USING v_old instead of ctrl_lf1
-    [ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,v_old,max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+    [ Aczbf, uczbf, h ] = getCZBFconstraints(x([1,2]),x(3),p_o,v_old,max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
 
     if h < 0 
-        error('Safety violated')
+        % error('Safety violated')
     end
     
     h_t(e) = h;
@@ -152,10 +154,10 @@ for e = 1:Ns
 %     A = [ Aclf; Av; Au ];
 %     u = [ uclf; uv; uu ];
 
-    l = [ lcbf; lv; lu ];
-    A = [ Acbf; Av; Au ];
-    u = [ ucbf; uv; uu ];
-    
+    l = [ lczbf; lv; lu ];
+    A = [ Aczbf; Av; Au ];
+    u = [ uczbf; uv; uu ];
+
 
     % q = [ -2*R'*ctrl; 0 ];
     q = -2*R'*ctrl;
@@ -170,7 +172,6 @@ if(errc > 0)
 else
     fprintf('Sim complete.');
 end
-
 
 %%% PLOTTING %%%
 
@@ -213,7 +214,7 @@ function [x_rk1, phi_rk1, v_rk1] = simulate_reference(time_step, x_rk, phi_rk, p
     v_rk1 = max(v_rk1, 0);
 end
 
-function [ Acbf, ucbf, h ] = getCBFconstraints(p_xy, phi, p_o, v, max_u, delta, gamma)
+function [ Aczbf, uczbf, h ] = getCZBFconstraints(p_xy, phi, p_o, v, max_turn, delta, gamma)
     p_dot = v * [ cos(phi); sin(phi) ];
 
     p_xo = p_o - p_xy;
@@ -222,29 +223,23 @@ function [ Acbf, ucbf, h ] = getCBFconstraints(p_xy, phi, p_o, v, max_u, delta, 
 
 
     % cross(p_dot, k)
-    r = sign_term*[ 0, 1; -1, 0 ] * p_dot / max_u;
+    r = sign_term*[ 0, 1; -1, 0 ] * p_dot / max_turn;
 
     p_c = p_xy + r;
     
     z = p_o - p_c;
     
-    h = z'*z - (v/max_u + delta)^2;
+    h = z'*z - (v/max_turn + delta)^2;
 
-    LfBF = 2*z'*p_dot/h/(1+h);
+    Lfh = -2*z'*p_dot;
 
-    LgBF = sign_term*LfBF/max_u;
+    Lgh = sign_term*Lfh/max_turn;
     
-    BF = -log(h/(1+h));
-    
-   
-    
-    
-    % %Trying something new here:
-    % Acbf = [ LfBF/v, LgBF, 0 ];
-    % ucbf = gamma/BF;
+    alpha = gamma*h;
 
-    Acbf = [ 0, LgBF ];
-    ucbf = gamma/BF - LfBF; 
+    Aczbf = [ 0, -Lgh ];
+    uczbf = alpha + Lfh;
+
 end
 
 

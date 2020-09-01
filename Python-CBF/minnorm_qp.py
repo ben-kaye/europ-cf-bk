@@ -21,7 +21,7 @@ max_turn = 1.5
 v_min = 0.01
 v_max = 12
 delta = 0.4
-a = 10
+a = 1
 
 
 x = np.array((3, 2, -np.radians(30))) # init state

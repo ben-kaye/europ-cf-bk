@@ -1,34 +1,22 @@
-% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-% *                                                                     *
-% *                         Ben Kaye, (c) 2020                          *
-% *                              Uses OSQP                              *
-% *                                                                     *
-% * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+clear 
 
-clear
 
-%%% SIMULATION PARAMETERS %%%
-
-sim_time = 10; % {s}
-step_size = 1e-4; % {s}
-Ts = 1e-3; % {s} f = 100Hz
-p_o = [ -1; 6]; % {m; m} object position
-p_0 = [ 3; 2 ]; % {m; m} initial drone position
-phi_0 = -1; % {rad} initial drone bearing
-x = [p_0; phi_0]; % {m; m; rad} state
-
-%%% CBF-CLF-QP PARAMETERS %%%
-
-delta = 0.4; % {m} avoidance distance
+sim_time = 1.55 ; % {s}
+step_size = 1e-3; % {s}
+delta = 0.2; % {m} avoidance distance
+gamma = 1;
 v = 0.5; % {ms-1}
-max_u = 1.5; % {rads-1}
-max_v = 12; % {ms-1}
-min_v = 0.1; % {ms-1}
-relax_weight = 10; % relax penalty
-R = diag([ 1, 1 ]); % control penalty
-gamma = 100;
+max_u = 1.5;
+max_v = 4;
+relax_weight = 100;
 
-%%% REFERENCE SIGNAL GENERATION %%%
+p_o = [ 5; 3 ];
+
+phi_0 = -1; % {rad}
+p_0 = [ 3; 2 ]; % {m; m}
+
+
+x = [p_0; phi_0]; % {m; m; rad} state
 
 p_r = [ 2; 3 ];
 x_r = p_r;
@@ -37,48 +25,58 @@ phi_rdot = 1/2;
 v_r = 1;
 v_rdot = 0;
 
-% compute CLF input to track ref
-[ ctrl1, ctrl2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
-ctrl = [ ctrl1; ctrl2 ];
-ctrl = constrain_u(ctrl, min_v, max_v, max_u); % {ms-1; rads-1} control vector
+% u = ones(2,1); % {ms-1; rads-1} control vec
+[ u1, u2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
+u = [ u1; u2 ];
+
 
 %%% QP SETUP %%%
 solver = osqp;
 
-[ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+Q = diag([1,1,1]);
+R = diag([1,1]);
+
+
+P = blkdiag(Q,R,relax_weight);
+q = [ -2*Q'*[ x_r; phi_r ]; zeros(3,1) ];
+
+Ax = [ eye(3), -[ cos(x(3)), 0; sin(x(3)), 0; 0, 1 ], zeros(3,1) ];
+lx = x;
+ux = x;
+
+
+[ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,u(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
 [ Aclf, uclf ] = getCLFconstraints(x([1,2]),x_r,x(3),phi_r,phi_rdot,v_r,v_rdot); %(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
 lclf = -inf;
 lcbf = -inf;
 
-P = blkdiag(R,relax_weight);
-q = [ -2*R'*ctrl; 0 ];
-
 Av = [ 1, 0, 0 ];
 uv = max_v;
-lv = min_v; % might rather, do 0
+lv = 0.1;
 
 Au = [ 0, 1, 0 ];
 uu = max_u;
 lu = -max_u;
 
-% l = [ lclf; lv; lu ];
-% A = [ Aclf; Av; Au ];
-% u = [ uclf; uv; uu ];
+l = [ lclf; lv; lu ];
+A = [ Aclf; Av; Au ];
+u = [ uclf; uv; uu ];
+A = [ zeros(3,3), A ];
 
-l = [ lcbf; lclf; lv; lu ];
-A = [ Acbf; Aclf; Av; Au ];
-u = [ ucbf; uclf; uv; uu ];
+% l = [ lcbf; lclf; lv; lu ];
+% A = [ Acbf; Aclf; Av; Au ];
+% u = [ ucbf; uclf; uv; uu ];
+% A = [ zeros(4,3), A ];
+
+A = [ A; Ax ];
+u = [ u; ux ];
+l = [ l; lx ];
 
 solver.setup(P,q,A,l,u,'warm_start',true,'verbose',false);
 
 %%% SIMULATION %%%
 
 N = floor(sim_time/step_size);
-Ns = floor(sim_time/Ts);
-
-if (Ns>N)
-    error('Sample_Time < Simulation_Step');
-end
 
 x_t = zeros(4,N);
 x_rt = zeros(2,N);
@@ -88,28 +86,25 @@ errc=0;
 
 switched = false;
 switched2 = false;
-for e = 1:Ns
+for e = 1:N
     % solve
     res = solver.solve();
     if res.info.status_val ~= 1
         %%% ERROR %%%
         errc = errc+1;
-        error('Primal infeasibility')
     else
         resx = res.x;
-        ctrl = resx([1,2]);
+        u_act = resx([4,5]);
     end
     
     
-    %simulate substep
-    for f = 1:floor(N/Ns)
-        x = simulate_state(step_size, x, ctrl);
-        [ x_r, phi_r, v_r ] = simulate_reference(step_size, x_r, phi_r, phi_rdot, v_r, v_rdot);
-    end
-    
+    %simulate 
+    x = simulate_state(step_size, x, u_act);
+    [ x_r, phi_r, v_r ] = simulate_reference(step_size, x_r, phi_r, phi_rdot, v_r, v_rdot);
+
     %store
     x_t(1:3, e) = x;
-    x_t([4,5], e) = ctrl;
+    x_t([4,5], e) = u_act;
     x_rt(:, e) = x_r;
 
 
@@ -117,22 +112,21 @@ for e = 1:Ns
     % [Lf, Lg, h] = getCBF(x([1,2]), x(3), p_o, v, max_u, delta, gamma);
 
 
-    v_old = ctrl(1);
-
     % (p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
-    [ ctrl_lf1, ctrl_lf2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
-    ctrl = [ ctrl_lf1; ctrl_lf2 ];    
-    ctrl = constrain_u(ctrl, min_v, max_v, max_u);
+    [ u1, u2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot);
+    u_act = [ u1; u2 ];
+    
+%     truncate u
+    u_max = [ max_v; max_u ];
+    u_act = sign(u_act) .* min(abs(u_act), u_max);
+    u_act(1) = max(u_act(1),0.1);
+    
+    % u = -Lf/Lg;
     
     
-    %%% USING v_old instead of ctrl_lf1
-    [ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,v_old,max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+    [ Acbf, ucbf, h ] = getCBFconstraints(x([1,2]),x(3),p_o,u_act(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
     [ Aclf, uclf ] = getCLFconstraints(x([1,2]),x_r,x(3),phi_r,phi_rdot,v_r,v_rdot); %(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot)
-    
-    if h < 0 
-        error('Safety violated')
-    end
-    
+
     h_t(e) = h;
     if e*step_size > 10  && ~switched
         phi_rdot = -phi_rdot;
@@ -147,34 +141,37 @@ for e = 1:Ns
        switched2 = true;
     end
     
-%     l = [ lclf; lv; lu ];
-%     A = [ Aclf; Av; Au ];
-%     u = [ uclf; uv; uu ];
 
-    l = [ lcbf; lclf; lv; lu ];
-    A = [ Acbf; Aclf; Av; Au ];
-    u = [ ucbf; uclf; uv; uu ];
+    A = [ Aclf; Av; Au ];
+    l = [ lclf; lv; lu ];
+    u = [ uclf; uv; uu ];
+    A = [ zeros(3,3), A ];
+
+
+    % A = [ Acbf; Aclf; Av; Au ];
+    % l = [ lcbf; lclf; lv; lu ];
+    % u = [ ucbf; uclf; uv; uu ];
+    % A = [ zeros(4,3), A ];
     
+    % update : q
+    q = [ -2*Q'*[ x_r; phi_r ]; zeros(3,1) ];
 
-    q = [ -2*R'*ctrl; 0 ];
-
+    Ax = [ eye(3), -[ cos(x(3)), 0; sin(x(3)), 0; 0, 1 ], zeros(3,1) ];
+    lx = x;
+    ux = x;
     
-    solver.update('Ax',A,'l',l,'u',u,'q',q);
+    A = [ A; Ax ];
+    u = [ u; ux ];
+    l = [ l; lx ];
+    
+    solver.update('Ax',A,'l',l,'u',u, 'q',q);
 
     
 end
 
-if(errc > 0)
-    fprintf('Sim complete. %d errors encountered\n', errc);
-else
-    fprintf('Sim complete.');
-end
 
-%%% PLOTTING %%%
 
 t = 0:step_size:sim_time;
-z = e*N/Ns;
-
 t = t(1:e);
 h_t = h_t(1:e);
 x_t = x_t(:,1:e);
@@ -182,18 +179,31 @@ x_rt = x_rt(:,1:e);
 
 u_t = x_t([4,5],:);
 
-plot_path
+u_t(:,1) = [nan;nan];
+figure(1)
+plot(t,u_t,'-','LineWidth', 1.5)
+hold on 
+plot(t,h_t, 'DisplayName', 'h')
+legend('v','\omega')
+hold off
 
-%%% FUNCTIONS %%%
+figure(2)
 
-function u = constrain_u(u,min_v,max_v,max_omega)
-    max_vals = [ max_v; max_omega ];
-    u = sign(u) .* min(abs(u), max_vals);
-    u(1) = max(u(1),min_v);    
-end
+px = x_t(1,:);
+py = x_t(2,:);
+plot(px,py,'-','LineWidth',1.5, 'Color',1/255*[64, 201, 255], 'DisplayName', 'Position');
+hold on
+plot(x_rt(1,:), x_rt(2,:), '-.', 'LineWidth',1, 'Color',[1, 0, 0],'DisplayName', 'Reference');
+viscircles(p_o', delta);
+axis equal
+hold off
 
 function x_k_1 = simulate_state(time_step, x_k, u)
     phi = x_k(3);
+    
+    % truncate u if necessary
+    % 
+
 
     x_dot = [ cos(phi), 0; sin(phi), 0; 0, 1 ]*u;
     
@@ -212,7 +222,7 @@ function [x_rk1, phi_rk1, v_rk1] = simulate_reference(time_step, x_rk, phi_rk, p
 end
 
 function [ Acbf, ucbf, h ] = getCBFconstraints(p_xy, phi, p_o, v, max_u, delta, gamma)
-    p_dot = v * [ cos(phi); sin(phi) ];
+    p_dot = v * [ -sin(phi); cos(phi) ];
 
     p_xo = p_o - p_xy;
     
@@ -229,17 +239,17 @@ function [ Acbf, ucbf, h ] = getCBFconstraints(p_xy, phi, p_o, v, max_u, delta, 
     h = z'*z - (v/max_u + delta)^2;
 
     LfBF = 2*z'*p_dot/h/(1+h);
-    
+
     LgBF = sign_term*LfBF/max_u;
     
     BF = -log(h/(1+h));
     
-   
+    %Trying something new here:
     
     
-    % %Trying something new here:
-    % Acbf = [ LfBF/v, LgBF, 0 ];
-    % ucbf = gamma/BF;
+    %Test here
+    Acbf = [ LfBF/v, LgBF, 0 ];
+    ucbf = gamma/BF;
 
     Acbf = [ 0, LgBF, 0 ];
     ucbf = gamma/BF - LfBF; 

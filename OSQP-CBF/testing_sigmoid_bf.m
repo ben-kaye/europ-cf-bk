@@ -5,6 +5,10 @@
 % *                                                                     *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
+% Implements sequential min-norm QP where the norm is the diff between 
+% the control input subject to BF safety constraint and the ideal CLF input.
+% The BF constraint is omega geq sigmoid(1/h^2) * omega_max * sign
+
 clear
 
 %%% SIMULATION PARAMETERS %%%
@@ -34,21 +38,21 @@ K2 = 5;
 
 p_r = [ 2; 3 ];
 x_r = p_r;
-phi_r = 1;
+phi_r = pi/3;
 phi_rdot = 1/2;
 v_r = 1;
 v_rdot = 0;
 
 % compute CLF input to track ref
-[ ctrl1, ctrl2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot,K1,K2);
-ctrl = [ ctrl1; ctrl2 ];
+[ ctrl_lf1, ctrl_lf2 ] = controlFromCLF(x([1,2]), x_r, x(3), phi_r, phi_rdot, v_r, v_rdot,K1,K2);
+ctrl = [ ctrl_lf1; ctrl_lf2 ];
 ctrl = constrain_u(ctrl, min_v, max_v, max_u); % {ms-1; rads-1} control vector
 
 %%% QP SETUP %%%
 solver = osqp;
 
-[ Aczbf, uczbf, h ] = getCZBFconstraints(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
-lczbf = -inf;
+[ Abf, ubf, h ] = getBFconstraint(x([1,2]),x(3),p_o,ctrl(1),max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+lbf = -inf;
 
 % P = blkdiag(R,relax_weight);
 P = R;
@@ -67,11 +71,11 @@ lu = -max_u;
 % A = [ Aclf; Av; Au ];
 % u = [ uclf; uv; uu ];
 
-l = [ lczbf; lv; lu ];
-A = [ Aczbf; Av; Au ];
-u = [ uczbf; uv; uu ];
+l = [ lbf; lv; lu ];
+A = [ Abf; Av; Au ];
+u = [ ubf; uv; uu ];
 
-solver.setup(P,q,A,l,u,'warm_start',true,'verbose',false);
+solver.setup(P,q,Abf,lbf,ubf,'warm_start',false,'verbose',false);
 
 %%% SIMULATION %%%
 
@@ -96,6 +100,7 @@ for e = 1:Ns
     if res.info.status_val ~= 1
         %%% ERROR %%%
         errc = errc+1;
+%         error('Primal infeasibility')
     else
         resx = res.x;
         ctrl = resx([1,2]);
@@ -126,7 +131,7 @@ for e = 1:Ns
     ctrl = constrain_u(ctrl, min_v, max_v, max_u);
     
     %%% USING v_old instead of ctrl_lf1
-    [ Aczbf, uczbf, h ] = getCZBFconstraints(x([1,2]),x(3),p_o,v_old,max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
+    [ Abf, ubf, h ] = getBFconstraint(x([1,2]),x(3),p_o,v_old,max_u,delta,gamma); %(p_xy, phi, p_o, v, max_u, delta, gamma) 
 
     if h < 0 
         % error('Safety violated')
@@ -146,19 +151,17 @@ for e = 1:Ns
        switched2 = true;
     end
     
-%     l = [ lclf; lv; lu ];
-%     A = [ Aclf; Av; Au ];
-%     u = [ uclf; uv; uu ];
 
-    l = [ lczbf; lv; lu ];
-    A = [ Aczbf; Av; Au ];
-    u = [ uczbf; uv; uu ];
+%     l = [ lbf; lv; lu ];
+%     A = [ Abf; Av; Au ];
+%     u = [ ubf; uv; uu ];
+
 
 
     % q = [ -2*R'*ctrl; 0 ];
     q = -2*R'*ctrl;
     
-    solver.update('Ax',A,'l',l,'u',u,'q',q);
+    solver.update('Ax',Abf,'l',lbf,'u',ubf,'q',q);
 
     
 end
@@ -210,7 +213,7 @@ function [x_rk1, phi_rk1, v_rk1] = simulate_reference(time_step, x_rk, phi_rk, p
     v_rk1 = max(v_rk1, 0);
 end
 
-function [ Aczbf, uczbf, h ] = getCZBFconstraints(p_xy, phi, p_o, v, max_turn, delta, gamma)
+function [ Abf, ubf, h ] = getBFconstraint(p_xy, phi, p_o, v, max_turn, delta, gamma)
     p_dot = v * [ cos(phi); sin(phi) ];
 
     p_xo = p_o - p_xy;
@@ -226,20 +229,18 @@ function [ Aczbf, uczbf, h ] = getCZBFconstraints(p_xy, phi, p_o, v, max_turn, d
     z = p_o - p_c;
     
     h = z'*z - (v/max_turn + delta)^2;
-
-    Lfh = -2*z'*p_dot;
-
-    Lgh = sign_term*Lfh/max_turn;
     
-    alpha = gamma*h;
+    t = exp(1/h^2);
+    sig = (t-1)/(t+1);
 
-    Aczbf = [ 0, -Lgh ];
-    uczbf = alpha + Lfh;
+    
+    Abf = [ 0, -1 ];
+    ubf = sig*sign_term*max_turn;
 
 end
 
 
-function [ u1, u2 ] = controlFromCLF(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot, k1, k2)
+function [ v, omega ] = controlFromCLF(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdot, k1, k2)
     e3 = phi_r - phi;
     e12 = [ cos(phi) sin(phi); -sin(phi) cos(phi) ] * (p_r - p_xy);
 
@@ -249,6 +250,6 @@ function [ u1, u2 ] = controlFromCLF(p_xy, p_r, phi, phi_r, phi_rdot, v_r, v_rdo
     alpha = atan(e2/v_r);
     e3_aux = alpha + e3;
 
-    u2 = phi_rdot + 2*e2*v_r*cos(e3_aux/2-alpha) + (v_r^2*sin(e3) - e2*v_rdot)/(v_r^2 + e2^2) + k2*sin(e3_aux/2);
-    u1 = v_r*cos(e3) - u2*v_r*sin(e3_aux/2)/(v_r^2 + e2^2) + k1*e1;
+    omega = phi_rdot + 2*e2*v_r*cos(e3_aux/2-alpha) + (v_r^2*sin(e3) - e2*v_rdot)/(v_r^2 + e2^2) + k2*sin(e3_aux/2);
+    v = v_r*cos(e3) - omega*v_r*sin(e3_aux/2)/(v_r^2 + e2^2) + k1*e1;
 end
