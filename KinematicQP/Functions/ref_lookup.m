@@ -13,7 +13,8 @@ function r = ref_lookup(r, t, step_sz, path_index)
                 end
             end
         case 0
-            r = [ 2; 3; pi/3; 0.5; 1; 0];
+            r(4) = 0.5;
+            r(6) = 0;
     end
 end
 

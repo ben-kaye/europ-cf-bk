@@ -7,7 +7,7 @@ fps = 30;
 Nf = ceil(Ns/sim_time/fps);
 
 
-path = plot(p(1,1), p(2,1),'.','MarkerSize',20, 'Color',1/255*[60, 71, 163]);
+path = plot(x_t(1,1), x_t(2,1),'.','MarkerSize',20, 'Color',1/255*[60, 71, 163]);
 hold on
 ref_path = plot(r_t(1,1),r_t(2,1), 'k-.', 'LineWidth',1);
 plot(p_o(1), p_o(2), '+', 'MarkerSize', 30, 'Color', [1,0,0],'DisplayName','Object')
