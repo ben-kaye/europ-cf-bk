@@ -16,7 +16,7 @@ v_min = 0; % {ms-1}
 v_max = 3; % {ms-1}
 % omeg_max = 1.5; % {rads-1}
 omeg_max = 3;
-q_gamma = 3;
+q_gamma = 100;
 
 k1 = 5;
 k2 = 5;
@@ -30,7 +30,7 @@ ux = [ v_max; omeg_max ];
 ctrls = [v_ctrl; omeg_ctrl];
 ctrls = sat_ctrls(ctrls, [v_min; -omeg_max], [v_max; omeg_max]);
 
-[ Abf, ubf] = augmented_zbf(x, ctrls(1), p_o, delta, q_gamma);
+[ Abf, ubf] = rbf2(x, ctrls(1), p_o, delta, q_gamma);
 
 H = diag([1, 1]);
 f = -H'*ctrls;
@@ -62,21 +62,8 @@ for e = 1:Ns
     %%% SUB-STEP FORWARD EULER INTEGRATION
     
     for s = 1:floor(N/Ns)
-        [x, r] = sim_xr(x, ctrls, r, step_size, 1);
-        
-        dist2 = sum((x([1,2]) - r([1,2])).^2);
-        tau = scale_time(step_size, dist2, 0.5, 0);
-        if Ts*e < 0.6
-            r(4) = r(4) - 1.1*step_size;
-        else
-            if Ts*e < 1
-                r(4) = -0.9;
-                r(6) = -0.05;
-            else 
-                r(4) = 0;
-                r(6) = 0;
-            end
-        end
+        [x, r] = sim_xr(x, ctrls, r, step_size);
+        r = ref_lookup(r,Ts*e,step_size,1);
     end
     
     %%% STORE RESULTS %%%
@@ -87,7 +74,7 @@ for e = 1:Ns
     
     %%% UPDATE %%%
     
-    [ Abf, ubf, h] = augmented_zbf(x, ctrls(1), p_o, delta, q_gamma);
+    [ Abf, ubf, h] = rbf2(x, ctrls(1), p_o, delta, q_gamma);
     
     h_t(e) = h;
 
@@ -106,59 +93,6 @@ plot_ctrls
 plot_res
 % animate_pos
 
-% override sim_xr
-function [x_1, r_1] = sim_xr(x, u, r, step_sz, scale)
-    phi = x(3);
-    x_dot = [ cos(phi), 0; sin(phi), 0; 0, 1 ] * u;
-    
-    phi_r = r(3);
-    v_r = r(5);
-    phi_rdot = r(4);
-    v_rdot = r(6);
-    r_dot =  [ v_r*[ cos(phi_r); sin(phi_r) ]; phi_rdot; 0; v_rdot; 0 ];
-    
-    x_1 = x + step_sz*x_dot;
-    
-    if scale
-        dist2 = sum((x([1,2]) - r([1,2])).^2);
-        tau = scale_time(step_sz, dist2, 1e-3, 0);
-    end
-    
-    r_1 = r + tau*r_dot;    
-end
-
-function [Abf, ubf, h] = augmented_zbf(x, v_last, p_o, delta, gamma)
-    
-    p = x([1,2]);
-    phi = x(3);
-    
-    z = p - p_o;
-    
-    zz = z'*z;
-    
-    c = cos(phi);
-    s = sin(phi);
-    
-    v_dir = [ c; s ];
-
-    sin2 = 2*c*s;
-    cos2 = c^2 - s^2;    
-    
-    h = 2*zz - (v_dir'*z)^2 - 2*delta^2;
-
-    omeg = (z(1)^2-z(2)^2)*sin2 - 2*z(1)*z(2)*cos2;
-    
-    
-    Lfh = 2*v_last*z'*v_dir;
-    Lgh = [ 0, omeg ];
-
-    alpha = h + h^3;
-    
-    % Z(linear)BF
-    ubf = gamma*alpha + Lfh;
-    Abf = -Lgh;
-    
-end
 
 
 

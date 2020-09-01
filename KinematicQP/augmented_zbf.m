@@ -22,8 +22,6 @@ function [Abf, ubf, h] = augmented_zbf(x, p_o, delta, gamma)
     
     coeff = 2*z'*v_dir;
     
-    c = 2*phi;
-    
     Lfh = 0;
     Lgh = coeff*[ 1, -z'*a_dir ];
 

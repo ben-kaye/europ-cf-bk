@@ -1,24 +1,13 @@
-%%% SIMULATION PARAMETERS %%%
+function [x_t, u_t, r_t, h_t, errs] = bf_qp(BF, sim_time, step_size, Ts, x0, r0, path_id, p_o, delta, v_min, v_max, omeg_max, gamma, k1, k2)
 
-sim_time = 10; % {s}
-step_size = 1e-3; % {s}
-Ts = 1e-1; % {s}
+%%% SIMULATION PARAMETERS %%%
 
 N = floor(sim_time/step_size);
 Ns = floor(sim_time/Ts);
 
-x = [ 3; 2; -3*pi/18 ]; % [ p_x, p_y, phi ]
-r = [ 2; 3; pi/3; 0.5; 1; 0]; % [ r_x, r_y, phi_r, phi_rdot, v_r, v_rdot ]
-p_o = [ -1; 6 ]; % {m, m}
-
-delta = 1.3; % {m} %%% BREAKS AT 1.3
-v_min = 0; % {ms-1}
-v_max = 3; % {ms-1}
-omeg_max = 1.5; % {rads-1}
-q_gamma = 3;
-
-k1 = 5;
-k2 = 5;
+x = x0; % [ p_x, p_y, phi ]
+r = r0;  % [ r_x, r_y, phi_r, phi_rdot, v_r, v_rdot ]
+% p_o = settings.po; % {m, m}
 
 %%% QP SETUP %%%
 
@@ -29,7 +18,7 @@ ux = [ v_max; omeg_max ];
 ctrls = [v_ctrl; omeg_ctrl];
 ctrls = sat_ctrls(ctrls, [v_min; -omeg_max], [v_max; omeg_max]);
 
-[ Abf, ubf] = augmented_zbf(x, p_o, delta, q_gamma);
+[ Abf, ubf] = BF(x, ctrls(1), p_o, delta, gamma);
 
 H = diag([1, 1]);
 f = -H'*ctrls;
@@ -44,7 +33,7 @@ h_t = NaN*ones(1, Ns);
 options =  optimset('Display','off');
 
 errc = 0;
-
+errs = logical(zeros(1,Ns));
 for e = 1:Ns
     %%% SOLVE %%%
     
@@ -52,8 +41,7 @@ for e = 1:Ns
     
     if isempty(ctrl_sol)
         %%% INFEASIBLE %%%
-        fprintf('err\n');
-        errc = ercc + 1;
+        errs(e) = 1;
     else
         %%% SOLVED %%%
         ctrls = ctrl_sol;
@@ -63,6 +51,7 @@ for e = 1:Ns
     
     for s = 1:floor(N/Ns)
         [x, r] = sim_xr(x, ctrls, r, step_size);
+        r = ref_lookup(r, Ts*e, step_size, path_id);
     end
     
     %%% STORE RESULTS %%%
@@ -73,7 +62,7 @@ for e = 1:Ns
     
     %%% UPDATE %%%
     
-    [ Abf, ubf, h] = augmented_zbf(x, p_o, delta, q_gamma);
+    [ Abf, ubf, h] = BF(x, ctrls(1), p_o, delta, gamma);
     
     h_t(e) = h;
 
@@ -83,9 +72,9 @@ for e = 1:Ns
     
     f = -H'*ctrls;
 end
+errc = sum(errs);
+fprintf('Simulation complete. %d errors.\n', errc);
 
-%%% PLOT %%%
+end
 
-plot_ctrls
-plot_res
-animate_pos
+
