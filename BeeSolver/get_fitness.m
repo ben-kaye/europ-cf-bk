@@ -12,7 +12,7 @@ function cost = get_fitness(Q_weights, R_weights)
         Z(5, h) = step.SSError;
     end
     
-    weights = [ 5 5 10 1 ];
+    weights = [ 2 2 1 1 ];
     
     M = [ 30 5 5 1000 100 ];
     
