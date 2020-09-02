@@ -76,5 +76,3 @@ errc = sum(errs);
 fprintf('Simulation complete. %d errors.\n', errc);
 
 end
-
-

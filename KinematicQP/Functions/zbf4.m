@@ -13,9 +13,9 @@ function [Abf, ubf, h] = zbf4(x, v_last, p_o, delta, gamma)
     v_dir = [ c; s ];
 
     b = v_dir'*z;
-    if sign(b) > 0
-        b = max(b, delta);
-    end
+%     if sign(b) > 0
+%         b = max(b, delta);
+%     end
     
     
     sin2 = 2*c*s;

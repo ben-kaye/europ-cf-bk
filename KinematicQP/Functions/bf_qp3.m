@@ -1,4 +1,4 @@
-function [x_t, u_t, r_t, h_t, errs] = bf_qp2(BF, sim_time, step_size, Ts, x0, r0, path_id, p_o, delta, v_min, v_max, omeg_max, gamma, k1, k2)
+function [x_t, u_t, r_t, h_t, errs] = bf_qp3(BF, sim_time, step_size, Ts, x0, r0, path_id, p_o, delta, v_min, v_max, omeg_max, gamma, k1, k2, n_avg)
 
 %%% SIMULATION PARAMETERS %%%
 
@@ -44,6 +44,12 @@ for e = 1:Ns
         %%% SOLVED %%%
         ctrls = ctrl_sol;
         ctrls = sat_ctrls(ctrls, [v_min; -omeg_max], [v_max; omeg_max]);
+        
+        if e > n_avg
+            ctrls = (ctrls + sum(u_t(:,e-n_avg:e-1), 2))/(n_avg+1);
+        end
+        % + low pass filter
+        
     end
     
     %%% SUB-STEP FORWARD EULER INTEGRATION
@@ -73,7 +79,4 @@ for e = 1:Ns
 end
 errc = sum(errs);
 fprintf('Simulation complete. %d errors.\n', errc);
-
 end
-
-
