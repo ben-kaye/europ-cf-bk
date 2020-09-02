@@ -1,7 +1,7 @@
 % function [x_t, u_t, r_t, h_t] = bf_qp(BF, sim_time, step_size, Ts, x0, r0, path_id p_o, delta, v_min, v_max, omeg_max, gamma, k1, k2)
 clear 
 
-sim_time = 5; % {s}
+sim_time = 4; % {s}
 step_size = 1e-3; % {s}
 Ts = 1e-2; % {s}
 
@@ -14,19 +14,21 @@ p_o = [ 1; 0.5 ]; % {m, m}
 
 path_id = 1;
 
-delta = 0.9; % {m}
-v_min = 0.7; % {ms-1}
+delta = 0.5; % {m}
+v_min = 0.5; % {ms-1}
 v_max = 3; % {ms-1}
 % omeg_max = 1.5; % {rads-1}
 omeg_max = 3;
-gamma = 3;
+gamma = 0.2;
+
+avg_n = 2; % moving average, number of previous points
 
 k1 = 5;
 k2 = 5;
 
-BF = @zbf3;
+BF = @zbf4;
 
-[x_t, u_t, r_t, h_t, errs] = bf_qp2(BF, sim_time, step_size, Ts, x0, r0, path_id, p_o, delta, v_min, v_max, omeg_max, gamma, k1, k2);
+[x_t, u_t, r_t, h_t, errs] = bf_qp3(BF, sim_time, step_size, Ts, x0, r0, path_id, p_o, delta, v_min, v_max, omeg_max, gamma, k1, k2, avg_n);
 
 plot_ctrls;
 plot_res;
