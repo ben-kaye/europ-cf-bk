@@ -25,9 +25,11 @@ function [Abf, ubf, h] = zbf1(x, v_last, p_o, delta, gamma)
     Lfh = 0;
     Lgh = coeff*[ 1, -z'*a_dir ];
 
-
+    
+    alpha = h;
+    
     % Z(linear)BF
-    ubf = gamma*h + Lfh;
+    ubf = gamma*alpha + Lfh;
     Abf = -Lgh;
     
 end

@@ -1,4 +1,4 @@
-%%% using ZBF on circular path %%%
+%%% using Lin-ZBF on circular path %%%
 
 clear 
 
@@ -16,7 +16,7 @@ p_o = [ -1; 6 ]; % {m, m}
 path_id = 0;
 
 delta = 1.3; % {m}
-v_min = 0; % {ms-1}
+v_min = 0.5; % {ms-1}
 v_max = 3; % {ms-1}
 omeg_max = 1.5;
 gamma = 3;
