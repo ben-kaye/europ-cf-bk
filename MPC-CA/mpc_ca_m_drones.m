@@ -130,7 +130,7 @@ A = make_placeholder_A(A,M,N,nx,nu);
 
 % osqp init and setup
 prob = osqp;
-prob.setup( P, q, A, l, u, 'warm_start', true, 'verbose', false );
+prob.setup( P, q, A, l, u, 'warm_start', false, 'verbose', false );
 
 % simulate
 
