@@ -12,4 +12,5 @@
 | Simulator       | Simulink model and utilities                        | Low-level Control System   |
 
 A reduced repository is available here with only the most necessary files: https://github.com/ben-kaye/bk-europ
+
 OSQP may be required for some scripts.
