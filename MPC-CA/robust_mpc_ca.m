@@ -18,9 +18,9 @@ VIS_ON = 1;
 N = 15;
 N_OBJ_STATES = 2;
 MIN_DIST = 0.05;
-IDEAL_DIST = 0.7;
+IDEAL_DIST = 0.9;
 EPSILON = [ 0.1 0.5 1 ];
-SIM_TIME = 20;
+SIM_TIME = 30;
 
 % initial conditions
 ref = [ 2; 0.5; 0; 0; 0; 0 ];
@@ -119,7 +119,7 @@ if (VIS_ON)
     hold on
     plot(ref(1), ref(2), 'rx', 'MarkerSize', 30, 'DisplayName', 'End')
     plot(obj_xy(1), obj_xy(2), 'r+', 'DisplayName', 'Radius of Avoidance')
-    viscircles(obj_xy', MIN_DIST)
+    viscircles(obj_xy', IDEAL_DIST)
 
     xlabel('x (m)')
     ylabel('y (m)')
@@ -134,7 +134,7 @@ x_hist = zeros((N+1)*nx, SIM_TIME);
 res = prob.solve();
 xN = res.x;
 
-vis_predicted_path
+% vis_predicted_path
 for e = EPSILON
     
     relaxation_params = e * ones(N+1, 1);
@@ -149,7 +149,7 @@ for e = EPSILON
     xN = res.x;
     
 %     viscircles(obj_xy', dists(1));
-    vis_predicted_path    
+%     vis_predicted_path    
 end
 
 

@@ -82,11 +82,9 @@ for z = 1:kmax-1
 end
 
 cf = patches{best_patch}.Center;
+cf = round(cf, 2);
 Qfinal = cf(1:6);
-Qfinal = round(Qfinal, 2);
 Rfinal = cf(7:9);
-Rfinal = round(Rfinal, 2);
-
 [ Qfinal, Rfinal ] = get_QR_actual(Qfinal, Rfinal);
 
 

@@ -45,7 +45,8 @@ x0 = xinit;
 
 % System State-Space
 
-% d_system.A([1:2, 4:5, 7:8], [1:2, 4:5, 7:8])
+
+% Precomputed system with Ts = 0.1. Control inputs x vel and y vel.
 Ad = [   1,  0,  0.0962912484723868,     0,                      0,                      0.0396218015830554;
         0,  1,  0,                      0.0962912484723868,     -0.0396218015830554,    0;
         0,  0,  0.894293322749997,      0,                      0,                      0.702694931894877;
@@ -60,19 +61,18 @@ Bd = [   0.00370875152761323,    0;
         0,                      0.105706677250003;
         0,                      -0.193245482770890;
         0.193245482770890,      0                       ];
-
-
-
-
     
 [nx, nu] = size(Bd);    
  Nstates = (N+1)*nx + N*nu; 
 
+ 
+max_vel = 2; 
+ 
 % constraints
 umin = [ -1; -1 ];
 umax = [ 1; 1 ];
-xmin = [ -inf; -inf; -2; -2; -inf; -inf ];
-xmax = [ inf; inf; +2; +2; inf; inf ];
+xmin = [ -inf; -inf; -max_vel; -max_vel; -inf; -inf ];
+xmax = [ inf; inf; +max_vel; +max_vel; inf; inf ];
 
 
 % LQ objective
@@ -99,8 +99,7 @@ Aeq = [ Ax, Bu ];
 
 leq = [];
 for h = 1:M
-    leq = [ leq;
-            -x0(:,h); zeros(N*nx, 1) ];
+    leq = [ leq; -x0(:,h); zeros(N*nx, 1) ];
 end
 ueq = leq;
 
@@ -190,8 +189,7 @@ for i = 1 : SIM_TIME
     
     leq = [];
     for h = 1:M
-        leq = [ leq;
-                -x0(:,h); zeros(N*nx, 1) ];
+        leq = [ leq; -x0(:,h); zeros(N*nx, 1) ];
     end
     
     l(1:M*(N+1)*nx) = leq;
