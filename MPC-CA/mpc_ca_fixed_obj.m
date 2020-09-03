@@ -7,7 +7,6 @@
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 % *                                                                     *
 % *             CrazyFlie controller model by Aren Karapet              *
-% *                          Using OSQP Solver                          *
 % *                                                                     *
 % * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
@@ -20,7 +19,7 @@ VIS_ON = 1;
 N = 5;
 % N_OBJ_STATES = 2;
 MIN_DIST = 0.05;
-IDEAL_DIST = 0.9;
+IDEAL_DIST = 0.7;
 EPSILON = [ 0.1 0.5 1 ];
 SIM_TIME = 30;
 
@@ -31,7 +30,7 @@ p_o = [ 1; 0.5 ];
 
 % System State-Space
 
-% d_system.A([1:2, 4:5, 7:8], [1:2, 4:5, 7:8])
+% Uses CrazyFlie model provided by Aren
 Ad = [   1,  0,  0.0962912484723868,     0,                      0,                      0.0396218015830554;
         0,  1,  0,                      0.0962912484723868,     -0.0396218015830554,    0;
         0,  0,  0.894293322749997,      0,                      0,                      0.702694931894877;
@@ -115,7 +114,7 @@ u_dist = inf*ones(N,1);
 
 if (VIS_ON)
     figure(1)
-    plot(x0(1), x0(2), 'bx', 'MarkerSize', 30, 'DisplayName', 'Start')
+    plot(x0(1), x0(2), 'b+', 'MarkerSize', 30, 'DisplayName', 'Start')
     hold on
     plot(ref(1), ref(2), 'rx', 'MarkerSize', 30, 'DisplayName', 'End')
     plot(p_o(1), p_o(2), 'r+', 'DisplayName', 'Radius of Avoidance')
@@ -128,7 +127,7 @@ end
 
 error_count = 0;
 
-x_hist = zeros((N+1)*nx, SIM_TIME);
+x_hist = NaN*ones((N+1)*nx, SIM_TIME);
 
 % solve unconstrained problem
 % res = prob.solve();
@@ -209,6 +208,7 @@ end
 if (VIS_ON)
     plot(x_hist(1,:), x_hist(2,:), '-^', 'LineWidth', 1.5, 'MarkerSize', 5, 'Color', 1/255*[73, 146, 214], 'DisplayName', 'Path Taken')
     axis equal
+    legend();
 end
 
 function [ A_dist, u_dist ] = dist_constraints(Np, nx, nu, p_o, min_dists, x_mpc)
