@@ -4,18 +4,18 @@ opts =  optimset('Display','off');
 
 % PARAMETERS
 VIS_ON = 1;
-Np = 10; % predictive horizon
+Np = 6; % predictive horizon
 MIN_DIST = 0.05;
 IDEAL_DIST = 1.5;
 EPSILON = [ 0.1 0.5 1 ];
-SIM_TIME = 10;
+SIM_TIME = 15;
 STEP_SIZE = 1e-3;
 Ts = 5e-2;
 
 DELTA = IDEAL_DIST;
 MAX_V = 3;
 MIN_V = 0;
-MAX_TURN = 1.5;
+MAX_TURN = 60;
 
 gamma = 0.3;
 k1 = 1;
@@ -102,8 +102,8 @@ mpc_params.Np = Np;
 mpc_params.options = opts;
 
 cbf_params.H = eye(2);
-cbf_params.ctrl_min = [ min_v; -max_omeg ];
-cbf_params.ctrl_max = [ MAX_V; max_omeg ];
+cbf_params.ctrl_min = [ MIN_V; -MAX_TURN ];
+cbf_params.ctrl_max = [ MAX_V; MAX_TURN ];
 cbf_params.delta = DELTA;
 cbf_params.gamma = gamma;
 cbf_params.k1 = k1;
@@ -136,6 +136,8 @@ for sp = 1:N_SAMPLE
     x_mpc = x_b([1,2,4,5,7,8]);
     [ ctrl_mpc, u_last, mpc_err ] = mpc_qp_controller(x_mpc, u_last, p_o, DELTA, mpc_err, mpc_params);
     ctrl_b = get_u(x_b, ctrl_mpc, m, g, Ku);
+    
+    ctrls_t(:, sp) = [ ctrl_cbf; ctrl_mpc ];
     
     for ss = 1:N_SUBS
         % simulate
@@ -178,6 +180,26 @@ title('MPC and CBF-QP controller applied to unseen LQR Drone Model');
 xlabel('x (m)')
 ylabel('y (m)')
 legend()
+
+figure(2)
+t = 0:Ts:SIM_TIME-Ts;
+subplot(1,2,1)
+plot(t, ctrls_t(1,:), 'LineWidth', 1.5, 'DisplayName', 'v')
+hold on
+plot(t, ctrls_t(2,:), 'LineWidth', 1.5,'DisplayName', '\omega')
+hold off
+title('CBF-QP Controls')
+xlabel('t (s)')
+legend();
+
+subplot(1,2,2)
+plot(t, ctrls_t(3,:), 'LineWidth', 1.5, 'DisplayName', 'v_x')
+hold on
+plot(t, ctrls_t(4,:), 'LineWidth', 1.5, 'DisplayName', 'v_y')
+hold off
+xlabel('t (s)')
+title('MPC-QP Controls')
+legend();
 
 function u = get_u(x, dotp, m, g, Ku)
     u = [ m*g; 0; 0; 0 ] - Ku*(x(3:end) - [ 0; dotp; zeros(7, 1) ]);
