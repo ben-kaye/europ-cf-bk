@@ -1,15 +1,15 @@
-function [ ctrl, u, errc ] = mpc_qp_controller(x, u_last, p_o, errc, params)
+function [ ctrl, u, errc ] = mpc_qp_controller(x, u_last, p_o, dist, errc, params)
 %MPC_QP_CONTROLLER implement sequential mpc qp controller
 %   requires params with Np, nx, nu, dists(Np x 1), Aeq((Np + 1)*nx x (Np + 1)*nx + Np*nu
-%   beq (Np+1 x 1), P square, q column, lineq, uineq
+%   beq (Np+1 x 1), H square, f column, LB, UB
     % update
     
-    [ A, b ] = dist_constraints(params.Np, params.nx, params.nu, p_o, params.dists, u_last);
-    beq = [ -x; zeros(params.Np, 1) ]; 
+    [ A, b ] = dist_constraints(params.Np, params.nx, params.nu, p_o, dist, u_last);
+    beq = [ -x; zeros(params.Np*params.nx, 1) ]; 
     
     % solve
     
-    result = quadprog(params.P, params.q, A, b, params.Aeq, beq, params.lineq, params.uineq, [], params.options);
+    result = quadprog(params.H, params.f, A, b, params.Aeq, beq, params.LB, params.UB, [], params.options);
     if ~isempty(result)
         u = result;
         errc = 0;
@@ -18,9 +18,9 @@ function [ ctrl, u, errc ] = mpc_qp_controller(x, u_last, p_o, errc, params)
         u = u_last;
     end
     
-    ctrl = u((params.Np + 1)*nx + 1:end);
+    ctrl = u((params.Np + 1)*params.nx + 1:end);
     ctrl = reshape(ctrl, params.nu, []);
-    ctrl = ctrl(:, 1 + ercc);    
+    ctrl = ctrl(:, 1 + errc);    
 end
 
 function [ A_dist, b_dist ] = dist_constraints(Np, nx, nu, p_o, min_dists, x_mpc)
