@@ -4,7 +4,7 @@
 | Folder          | Description                                         | Relevant to Report Section |
 |-----------------|-----------------------------------------------------|----------------------------|
 | BeeSolver       | Implement a version of the  Bee's Solver algorithm  | Low-level Control System   |
-| ComparingModels | Compares the MPC controller with the CBF controller | Comparing Controllers      |
+| Controllers     | Compares the MPC controller with the CBF controller | Comparing Controllers      |
 | KinematicQP     | Implements the CBF controller in various forms      | Non-linear Control         |
 | MPC-CA          | Implements the MPC controller                       | Model Predictive Control   |
 | OSQP-BF         | Contains implementation of  traffic CBFs            | Non-linear Control         |
