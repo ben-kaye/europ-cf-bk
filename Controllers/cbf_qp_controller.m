@@ -12,7 +12,7 @@ function u = cbf_qp_controller(x, r, p_o, v_last, params)
     [ A, b, ~ ] = sf_constraints(x, v_last, params.ctrl_max(2), p_o, params.delta, params.gamma);
         
     % solve
-    u = quadprog(H, f, A, b, [], [], [], [], [], params.options);
+    u = quadprog(params.H, f, A, b, [], [], [], [], [], params.options);
     u = sat_ctrls(u, params.ctrl_min, params.ctrl_max);
 end
 
@@ -32,11 +32,17 @@ function [Abf, ubf, h] = sf_constraints(x, v_last, max_v, p_o, delta, gamma)
 
     alpha = atan2(z(2), z(1));
     c_h = cos((alpha - phi)/2);  
+    s_h = sin((alpha - phi)/2);
     
     h = zz*(2 + c_h) - 2*delta^2;
     
-    a1 = z/sqrt(zz - (z'*v_dir)^2);
-    
+    x = zz - (z'*v_dir)^2;
+    if x > 0
+        a1 = s_h/2/sqrt(x);
+    else
+        a1 = 1e3;
+    end
+
     Lfh = z'*v_dir*v_last*(2 + c_h) + a1*v_last;
     Lgh = [ 0, a1*z'*a_dir ];
     
