@@ -1,4 +1,4 @@
-function u = cbf_qp_controller(x, r, p_o, v_last, params)
+function u = cbf_2_qp_controller(x, r, p_o, v_last, params)
 %CBF_QP_CONTROLLER for kinematic drone model
 %   requires params containing k1, k2, ctrl_min(2x1), ctrl_max(2x1),
 %   H(2x2), options(quadprog object), delta, gamma
@@ -17,7 +17,6 @@ function u = cbf_qp_controller(x, r, p_o, v_last, params)
 end
 
 function [Abf, ubf, h] = sf_constraints(x, v_last, max_v, p_o, delta, gamma)
-
     p = x([1,2]);
     phi = x(3);
     
@@ -29,18 +28,23 @@ function [Abf, ubf, h] = sf_constraints(x, v_last, max_v, p_o, delta, gamma)
     s = sin(phi);
     
     v_dir = [ c; s ];
+    a_dir = [ -s; c ];
 
-    sin2 = 2*c*s;
-    cos2 = c^2 - s^2;    
+    alpha = atan2(z(2), z(1));
+    c_h = cos((alpha - phi)/2);  
+    s_h = sin((alpha - phi)/2);
     
-    h = 2*zz - (v_dir'*z)^2 - 2*delta^2;
+    h = zz*(2 + c_h) - 2*delta^2;
+    
+    x = zz - (z'*v_dir)^2;
+    if x > 0
+        a1 = s_h/2/sqrt(x);
+    else
+        a1 = 1e3;
+    end
 
-    omeg = (z(1)^2-z(2)^2)*sin2 - 2*z(1)*z(2)*cos2;
-    
-    
-    Lfh = 2*v_last*z'*v_dir;
-    Lgh = [ 0, omeg ];
-    
+    Lfh = z'*v_dir*v_last*(2 + c_h) + a1*v_last;
+    Lgh = [ 0, a1*z'*a_dir ];
     
     uv = -max_v*min(1, 1/(h + 1));
     
