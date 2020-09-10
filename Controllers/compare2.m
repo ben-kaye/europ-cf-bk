@@ -17,9 +17,9 @@ MAX_V = 3;
 MIN_V = 0;
 MAX_TURN = 60;
 
-gamma = 0.3;
-k1 = 1;
-k2 = 1;
+gamma = 1;
+k1 = 2;
+k2 = 2;
 
 
 init_pos = [ -2; 1 ];
@@ -126,6 +126,8 @@ x_t = NaN*ones(4, N_SAMPLE);
 r_t = NaN*ones(2, N_SAMPLE);
 ctrls_t = NaN*ones(4, N_SAMPLE);
 
+theta_t = NaN*ones(6, N_SAMPLE);
+
 for sp = 1:N_SAMPLE
     x_cbf = [ x_a([1,2]); atan2(x_a(5), x_a(4)) ];
     v_last = vecnorm(x_a([4,5]));
@@ -157,6 +159,7 @@ for sp = 1:N_SAMPLE
     
     x_t(:, sp) = [ x_a([1,2]); x_b([1,2]) ];
     r_t(:, sp) = r_cbf([1,2]);
+    theta_t(:, sp) = [ x_a(7:9); x_b(7:9) ];
     
 end
 

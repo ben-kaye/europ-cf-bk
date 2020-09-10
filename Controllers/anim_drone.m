@@ -1,7 +1,7 @@
 
 anim_path = "C:\\Users\\Ben\\Documents\\EUROP\\Controllers\\_fr\\fr_%d";
 
-GIF = 1;
+GIF = 0;
 
 drone = init_graphic();
 fig = figure('units','normalized','outerposition',[0 0 1 1]);
